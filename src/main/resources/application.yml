@@ -2,11 +2,11 @@ server:
   port: 8085
 spring:
   application:
-    name: "list"
-#  profiles:
-#    active: "prod"
+    name: "app"
+  #  profiles:
+  #    active: "prod"
   datasource:
-    url: jdbc:postgresql://localhost:5434/listdb
+    url: jdbc:postgresql://localhost:5435/appdb
     username: postgres
     password: password
   jpa:
@@ -20,11 +20,11 @@ spring:
         globallly_qouted_identifiers: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-#  servlet:
-#    multipart:
-#      enable: true
-#      max-file-size: 1000MB
-#      max-request-size: 1000MB
+  #  servlet:
+  #    multipart:
+  #      enable: true
+  #      max-file-size: 1000MB
+  #      max-request-size: 1000MB
   config:
     import: "optional:configserver:http://localhost:8071/"
   cloud:
@@ -86,15 +86,15 @@ eureka:
 
 info:
   app:
-    name: "list"
-    description: "Corelate List Builder"
+    name: "app"
+    description: "Corelate Application Builder"
     version: "1.0.0"
 
 logging:
   level:
     com:
       corelate:
-        orchestrator: DEBUG
+        app: DEBUG
   pattern:
     level: "%5p [${spring.application.name},%X{trace_id},%X{span_id}]"
 

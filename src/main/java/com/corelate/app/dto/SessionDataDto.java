@@ -17,9 +17,9 @@ public class SessionDataDto extends BaseDto {
     @NotBlank(message = "workflowId is required")
     private String workflowId;
 
-    private Instant startedAt;
+    private String startedAt;
 
-    private Instant lastUpdatedAt;
+    private String lastUpdatedAt;
 
     private String currentNodeId;
 

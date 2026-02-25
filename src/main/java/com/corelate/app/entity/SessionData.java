@@ -3,7 +3,6 @@ package com.corelate.app.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
-import java.time.Instant;
 
 @Entity
 @Table(name = "session_data")
@@ -19,9 +18,9 @@ public class SessionData extends BaseEntity {
 
     private String workflowId;
 
-    private Instant startedAt;
+    private String startedAt;
 
-    private Instant lastUpdatedAt;
+    private String lastUpdatedAt;
 
     private String currentNodeId;
 

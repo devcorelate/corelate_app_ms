@@ -19,11 +19,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @Tag(
         name = "CRUD REST APIs for Session Data in Corelate",
-        description = "REST APIs in Corelate to ADD, UPDATE, FETCH and DELETE SessionData"
+        description = "REST APIs in Corelate to ADD, UPDATE and DELETE SessionData"
 )
 @RestController
 @RequestMapping(path = "/session-data", produces = {MediaType.APPLICATION_JSON_VALUE})
@@ -79,31 +77,5 @@ public class SessionDataController {
         logger.debug("deleteSessionData method end");
         return ResponseEntity.status(HttpStatus.OK)
                 .body(new ResponseDto(AppConstants.STATUS_200, AppConstants.MESSAGE_200));
-    }
-
-    @Operation(summary = "Fetch All Session Data REST API", description = "REST API to fetch all SessionData")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "HTTP Status OK"),
-            @ApiResponse(responseCode = "500", description = "HTTP Status Internal Server Error", content = @Content(schema = @Schema(implementation = com.corelate.app.dto.ErrorResponseDto.class)))
-    })
-    @GetMapping("/fetch/all")
-    public ResponseEntity<List<SessionDataDto>> fetchAllSessionData() {
-        logger.debug("fetchAllSessionData method start");
-        List<SessionDataDto> sessionDataDtos = sessionDataService.fetchAllSessionData();
-        logger.debug("fetchAllSessionData method end");
-        return ResponseEntity.status(HttpStatus.OK).body(sessionDataDtos);
-    }
-
-    @Operation(summary = "Fetch Session Data By Id REST API", description = "REST API to fetch SessionData by sessionId")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "HTTP Status OK"),
-            @ApiResponse(responseCode = "500", description = "HTTP Status Internal Server Error", content = @Content(schema = @Schema(implementation = com.corelate.app.dto.ErrorResponseDto.class)))
-    })
-    @GetMapping("/fetch/{sessionId}")
-    public ResponseEntity<SessionDataDto> fetchSessionDataById(@PathVariable String sessionId) {
-        logger.debug("fetchSessionDataById method start");
-        SessionDataDto sessionDataDto = sessionDataService.fetchSessionDataById(sessionId);
-        logger.debug("fetchSessionDataById method end");
-        return ResponseEntity.status(HttpStatus.OK).body(sessionDataDto);
     }
 }

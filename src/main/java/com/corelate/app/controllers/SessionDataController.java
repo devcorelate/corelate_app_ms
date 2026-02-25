@@ -19,9 +19,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(
         name = "CRUD REST APIs for Session Data in Corelate",
-        description = "REST APIs in Corelate to ADD, UPDATE and DELETE SessionData"
+        description = "REST APIs in Corelate to ADD, UPDATE, FETCH and DELETE SessionData"
 )
 @RestController
 @RequestMapping(path = "/session-data", produces = {MediaType.APPLICATION_JSON_VALUE})

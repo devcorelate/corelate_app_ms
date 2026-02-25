@@ -1,8 +1,12 @@
 package com.corelate.app.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+
+import java.time.Instant;
+import java.util.Map;
 
 @Data
 public class SessionDataDto extends BaseDto {
@@ -13,15 +17,30 @@ public class SessionDataDto extends BaseDto {
     @NotBlank(message = "workflowId is required")
     private String workflowId;
 
-    private String startedAt;
+    private Instant startedAt;
 
-    private String lastUpdatedAt;
+    private Instant lastUpdatedAt;
 
     private String currentNodeId;
 
-    private JsonNode steps;
+    @Valid
+    private Map<String, SessionStepDto> steps;
 
-    private JsonNode gatewayDecisions;
+    private Map<String, JsonNode> gatewayDecisions;
 
     private String returnTo;
+
+    @Data
+    public static class SessionStepDto {
+
+        private String elementId;
+
+        private String elementType;
+
+        private String status;
+
+        private JsonNode data;
+
+        private Instant completedAt;
+    }
 }

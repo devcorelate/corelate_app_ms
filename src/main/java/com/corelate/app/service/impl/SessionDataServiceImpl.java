@@ -6,12 +6,15 @@ import com.corelate.app.exeption.ResourceNotFoundException;
 import com.corelate.app.repository.SessionDataRepository;
 import com.corelate.app.service.ISessionDataService;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class SessionDataServiceImpl implements ISessionDataService {
@@ -96,20 +99,33 @@ public class SessionDataServiceImpl implements ISessionDataService {
         dto.setStartedAt(sessionData.getStartedAt());
         dto.setLastUpdatedAt(sessionData.getLastUpdatedAt());
         dto.setCurrentNodeId(sessionData.getCurrentNodeId());
-        dto.setSteps(toJsonNode(sessionData.getSteps()));
-        dto.setGatewayDecisions(toJsonNode(sessionData.getGatewayDecisions()));
+        dto.setSteps(toStepMap(sessionData.getSteps()));
+        dto.setGatewayDecisions(toGatewayDecisionMap(sessionData.getGatewayDecisions()));
         dto.setReturnTo(sessionData.getReturnTo());
         return dto;
     }
 
-    private JsonNode toJsonNode(String json) {
+    private Map<String, SessionDataDto.SessionStepDto> toStepMap(String json) {
         if (json == null || json.isBlank()) {
-            return null;
+            return Collections.emptyMap();
         }
         try {
-            return objectMapper.readTree(json);
+            return objectMapper.readValue(json, new TypeReference<>() {
+            });
         } catch (JsonProcessingException ex) {
-            throw new IllegalArgumentException("Invalid JSON stored for SessionData", ex);
+            throw new IllegalArgumentException("Invalid steps JSON stored for SessionData", ex);
+        }
+    }
+
+    private Map<String, JsonNode> toGatewayDecisionMap(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {
+            });
+        } catch (JsonProcessingException ex) {
+            throw new IllegalArgumentException("Invalid gateway decisions JSON stored for SessionData", ex);
         }
     }
 }

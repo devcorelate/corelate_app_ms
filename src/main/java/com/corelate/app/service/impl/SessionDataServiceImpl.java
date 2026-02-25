@@ -6,10 +6,12 @@ import com.corelate.app.exeption.ResourceNotFoundException;
 import com.corelate.app.repository.SessionDataRepository;
 import com.corelate.app.service.ISessionDataService;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class SessionDataServiceImpl implements ISessionDataService {
@@ -35,6 +37,7 @@ public class SessionDataServiceImpl implements ISessionDataService {
         SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
 
+        sessionDataDto.setSessionId(sessionId);
         mapToEntity(sessionDataDto, existingData);
         existingData.setUpdatedAt(LocalDateTime.now());
         existingData.setUpdatedBy(sessionDataDto.getUpdatedBy());
@@ -46,6 +49,21 @@ public class SessionDataServiceImpl implements ISessionDataService {
         SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
         sessionDataRepository.delete(existingData);
+    }
+
+    @Override
+    public List<SessionDataDto> fetchAllSessionData() {
+        return sessionDataRepository.findAll()
+                .stream()
+                .map(this::mapToDto)
+                .toList();
+    }
+
+    @Override
+    public SessionDataDto fetchSessionDataById(String sessionId) {
+        SessionData sessionData = sessionDataRepository.findBySessionId(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
+        return mapToDto(sessionData);
     }
 
     private SessionData mapToEntity(SessionDataDto sessionDataDto, SessionData sessionData) {
@@ -68,6 +86,30 @@ public class SessionDataServiceImpl implements ISessionDataService {
             return objectMapper.writeValueAsString(object);
         } catch (JsonProcessingException ex) {
             throw new IllegalArgumentException("Invalid JSON payload for SessionData", ex);
+        }
+    }
+
+    private SessionDataDto mapToDto(SessionData sessionData) {
+        SessionDataDto dto = new SessionDataDto();
+        dto.setSessionId(sessionData.getSessionId());
+        dto.setWorkflowId(sessionData.getWorkflowId());
+        dto.setStartedAt(sessionData.getStartedAt());
+        dto.setLastUpdatedAt(sessionData.getLastUpdatedAt());
+        dto.setCurrentNodeId(sessionData.getCurrentNodeId());
+        dto.setSteps(toJsonNode(sessionData.getSteps()));
+        dto.setGatewayDecisions(toJsonNode(sessionData.getGatewayDecisions()));
+        dto.setReturnTo(sessionData.getReturnTo());
+        return dto;
+    }
+
+    private JsonNode toJsonNode(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(json);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalArgumentException("Invalid JSON stored for SessionData", ex);
         }
     }
 }

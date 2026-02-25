@@ -8,6 +8,4 @@ import java.util.Optional;
 public interface SessionDataRepository extends JpaRepository<SessionData, Long> {
 
     Optional<SessionData> findBySessionId(String sessionId);
-
-    void deleteBySessionId(String sessionId);
 }

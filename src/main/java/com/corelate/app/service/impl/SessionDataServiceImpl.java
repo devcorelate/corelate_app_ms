@@ -10,6 +10,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -55,6 +56,7 @@ public class SessionDataServiceImpl implements ISessionDataService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<SessionDataDto> fetchAllSessionData() {
         return sessionDataRepository.findAll()
                 .stream()
@@ -63,6 +65,7 @@ public class SessionDataServiceImpl implements ISessionDataService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public SessionDataDto fetchSessionDataById(String sessionId) {
         SessionData sessionData = sessionDataRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));

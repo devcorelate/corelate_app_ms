@@ -25,11 +25,9 @@ public class SessionData extends BaseEntity {
 
     private String currentNodeId;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String steps;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String gatewayDecisions;
 

@@ -46,7 +46,8 @@ The Application Management microservice is part of the Corelate ecosystem, respo
   - Spring Boot Actuator
 - **API Documentation**: SpringDoc OpenAPI 3 (Swagger UI)
 - **Build Tool**: Maven 3.9+
-- **Containerization**: Docker (Jib Maven Plugin)
+- **Containerization**: Google Jib with Distroless base image
+- **CI/CD**: GitHub Actions with AWS ECR
 
 ## Architecture
 
@@ -427,21 +428,135 @@ metrics:
     application: app
 ```
 
+## CI/CD Pipeline
+
+### GitHub Actions Workflow
+
+The project uses GitHub Actions for automated builds and deployments to AWS ECR.
+
+**Workflow File**: `.github/workflows/build.yml`
+
+**Triggers**:
+- Push to `main` branch
+- Push to `develop` branch
+- Manual workflow dispatch
+
+**Pipeline Steps**:
+1. Checkout code
+2. Set up JDK 21 with Maven cache
+3. Configure AWS credentials via OIDC
+4. Login to Amazon ECR
+5. Generate immutable image tags
+6. Build and push with Jib
+7. Display image details
+
+**Required Secrets**:
+- `AWS_ROLE_ARN`: IAM role ARN for OIDC authentication
+
+**Image Tags Generated**:
+- Full commit SHA (primary)
+- Short commit SHA (7 chars)
+- Branch + timestamp
+- Version + build number + SHA
+
+### Setting Up CI/CD
+
+1. **Add GitHub Secret**:
+   - Go to repository Settings → Secrets and variables → Actions
+   - Add `AWS_ROLE_ARN` with value: `arn:aws:iam::689635266888:role/GitHubActionsECRRole`
+
+2. **Enable ECR Tag Immutability**:
+   ```bash
+   aws ecr put-image-tag-mutability \
+     --repository-name bpmn/corelate_list_ms \
+     --image-tag-mutability IMMUTABLE \
+     --region ap-southeast-1
+   ```
+
+3. **Test the Pipeline**:
+   - Push to `develop` or `main` branch
+   - Check Actions tab for workflow execution
+   - Verify image in ECR with all tags
+
+### Local Build Testing
+
+```bash
+# Test Jib build locally
+./mvnw clean compile jib:dockerBuild
+
+# Run the local image
+docker run -p 8085:8085 \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5435/appdb \
+  689635266888.dkr.ecr.ap-southeast-1.amazonaws.com/bpmn/corelate_list_ms:latest
+```
+
 ## Docker Deployment
 
 ### Build Docker Image with Jib
 
+The project uses Google Jib for containerless Docker builds with a distroless base image for enhanced security.
+
 ```bash
-# Build and push to Docker Hub
+# Build and push to ECR (requires AWS authentication)
 ./mvnw clean compile jib:build
 
 # Build to local Docker daemon
 ./mvnw clean compile jib:dockerBuild
 ```
 
-**Image**: `devcorelate01/app:v1.4.08`
+**Production Image**: `689635266888.dkr.ecr.ap-southeast-1.amazonaws.com/bpmn/corelate_list_ms`
 
-### Using Dockerfile
+**Base Image**: `gcr.io/distroless/java21-debian12`
+- Minimal attack surface (no shell, no package manager)
+- ~95% CVE reduction compared to standard JRE images
+- Production-ready and optimized for Java 21
+
+### Image Tagging Strategy
+
+The CI/CD pipeline creates immutable tags for traceability:
+
+- `{full-commit-sha}` - Full Git commit SHA (primary identifier)
+- `{short-commit-sha}` - 7-character commit SHA
+- `{branch}-{timestamp}` - Branch name with build timestamp
+- `{version}-{build-number}-{short-sha}` - Semantic version with build info
+
+### CI/CD Pipeline
+
+GitHub Actions automatically builds and pushes images on:
+- Push to `main` branch
+- Push to `develop` branch
+- Manual workflow dispatch
+
+**Required Secret**: `AWS_ROLE_ARN` (configured for OIDC authentication)
+
+### Debugging Distroless Containers
+
+Since distroless images have no shell, use Spring Boot Actuator for debugging:
+
+```bash
+# Health check
+curl http://localhost:8085/actuator/health
+
+# Metrics
+curl http://localhost:8085/actuator/metrics
+
+# Environment variables
+curl http://localhost:8085/actuator/env
+
+# Thread dump
+curl http://localhost:8085/actuator/threaddump
+
+# Heap dump
+curl http://localhost:8085/actuator/heapdump -O
+```
+
+### Using Dockerfile (Alternative)
+
+For local development with shell access:
+
+### Using Dockerfile (Alternative)
+
+For local development with shell access:
 
 ```bash
 # Build image
@@ -458,15 +573,17 @@ docker run -d \
   corelate-app:latest
 ```
 
+**Note**: The Dockerfile uses `eclipse-temurin:21-jre-alpine` for development. Production deployments use the distroless image via Jib.
+
 ### Docker Compose Example
 
 ```yaml
 version: '3.8'
 services:
   app:
-    image: devcorelate01/app:v1.4.08
+    image: 689635266888.dkr.ecr.ap-southeast-1.amazonaws.com/bpmn/corelate_list_ms:latest
     ports:
-      - "8085:8080"
+      - "8085:8085"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/appdb
@@ -477,10 +594,11 @@ services:
       - kafka
       - eureka
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:8080/actuator/health"]
+      test: ["CMD-SHELL", "wget --spider http://localhost:8085/actuator/health || exit 1"]
       interval: 30s
       timeout: 3s
       retries: 3
+      start_period: 60s
 ```
 
 ## Development
@@ -584,6 +702,27 @@ resilience4j.ratelimiter:
 
 ## Security
 
+### Container Security
+
+The application uses Google's distroless base image for production deployments:
+
+- **Minimal Attack Surface**: No shell, no package manager, no unnecessary binaries
+- **CVE Reduction**: ~95% fewer vulnerabilities compared to standard JRE images
+- **Immutable Infrastructure**: All image tags are immutable for audit trail
+- **Non-root User**: Application runs as non-root user
+
+### Image Scanning
+
+ECR image scanning is recommended for vulnerability detection:
+
+```bash
+# Enable image scanning on ECR repository
+aws ecr put-image-scanning-configuration \
+  --repository-name bpmn/corelate_list_ms \
+  --image-scanning-configuration scanOnPush=true \
+  --region ap-southeast-1
+```
+
 ### JWT Integration
 
 The service includes JWT utility for token validation:
@@ -595,6 +734,13 @@ The service includes JWT utility for token validation:
 Custom encryption/decryption service available:
 - Key-based encryption
 - Configurable encryption key in `application.yml`
+
+### AWS Authentication
+
+CI/CD uses OIDC (OpenID Connect) for AWS authentication:
+- No long-lived credentials stored in GitHub
+- IAM role with least privilege access
+- Temporary credentials per build session
 
 ### Security Dependencies (Commented)
 
@@ -612,6 +758,9 @@ Spring Security dependencies are present but commented out. To enable:
 - Implement proper authentication/authorization
 - Validate all input data
 - Use prepared statements (JPA handles this)
+- Enable ECR image scanning
+- Regular dependency updates via Dependabot
+- Monitor security advisories
 
 ## Integration with Other Services
 

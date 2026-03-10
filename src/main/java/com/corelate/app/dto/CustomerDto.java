@@ -1,13 +1,14 @@
 package com.corelate.app.dto;
 
-import com.corelate.app.dto.BaseEntity;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class CustomerDto extends BaseEntity {
     @NotEmpty(message = "Name can not be empty")
     @Size(min = 2, max = 30, message = "The length of the first name should be between 5 and 30")

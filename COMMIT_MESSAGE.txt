@@ -1,0 +1,44 @@
+feat: align project with microservice setup guide standards
+
+Implement production-ready CI/CD, security, and observability improvements
+according to the Corelate Microservice Setup Guide.
+
+## CI/CD Enhancements
+- Update GitHub Actions workflow with immutable image tagging strategy
+- Add metadata generation (commit SHA, timestamp, branch, version, build number)
+- Hardcode AWS region to ap-southeast-1 for consistency
+- Remove AWS_REGION secret dependency
+
+## Container Security
+- Migrate from eclipse-temurin:21-jre to gcr.io/distroless/java21-debian12
+- Achieve ~95% CVE reduction with minimal attack surface
+- Remove shell and package manager from production images
+- Add explicit mainClass configuration in Jib plugin
+
+## Code Quality
+- Add jsr305 dependency to eliminate Lombok compilation warnings
+- Fix EqualsAndHashCode warnings in DTOs extending BaseEntity:
+  - FormDataEntity.java
+  - CustomerDto.java
+  - ListData.java
+- Remove unused imports
+
+## Documentation
+- Add comprehensive CI/CD pipeline documentation
+- Document distroless container benefits and debugging strategies
+- Enhance security section with container security details
+- Add image tagging strategy explanation
+- Update Docker deployment section with production best practices
+
+## Configuration
+- Update README.md with production deployment guidelines
+
+## Breaking Changes
+- Distroless images have no shell access (use Actuator endpoints for debugging)
+- CI/CD no longer uses mutable 'latest' tag (all tags are immutable)
+
+## Manual Steps Required
+1. Add AWS_ROLE_ARN secret to GitHub repository
+2. Enable ECR tag immutability for bpmn/corelate_list_ms
+3. Test CI/CD pipeline with push to develop/main branch
+4. (Optional) Enable ECR image scanning

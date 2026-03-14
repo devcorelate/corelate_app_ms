@@ -65,4 +65,6 @@ public interface IAppService {
 	 * @return
 	 */
 	List<FormDataDto> getAllDataByWorkflowId(String templateId);
+
+	void syncMockApps(List<MockAppDto> mockAppDtos);
 }

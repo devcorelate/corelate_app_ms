@@ -231,4 +231,5 @@ public class AppController {
         logger.debug("fetchAllLists method end");
         return ResponseEntity.status(HttpStatus.OK).body(ListDtos);
     }
+
 }

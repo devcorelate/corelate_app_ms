@@ -5,12 +5,14 @@ import com.corelate.app.dto.*;
 import com.corelate.app.entity.FormData;
 import com.corelate.app.entity.FormDataEntity;
 import com.corelate.app.entity.ListData;
+import com.corelate.app.entity.MockApp;
 import com.corelate.app.entity.PublishLog;
 import com.corelate.app.exeption.ResourceNotFoundException;
 import com.corelate.app.mapper.AppMapper;
 import com.corelate.app.repository.FormDataEntityRepository;
 import com.corelate.app.repository.FormDataRepository;
 import com.corelate.app.repository.ListRepository;
+import com.corelate.app.repository.MockAppRepository;
 import com.corelate.app.repository.PublishLogsRepository;
 import com.corelate.app.service.IAppService;
 import com.corelate.app.service.client.AppFeignClient;
@@ -41,6 +43,7 @@ public class AppServiceImpl implements IAppService {
     private FormDataRepository formDataRepository;
     private FormDataEntityRepository formDataEntityRepository;
     private PublishLogsRepository publishLogsRepository;
+    private MockAppRepository mockAppRepository;
     private AppFeignClient appFeignClient;
     private final StreamBridge streamBridge;
 
@@ -216,5 +219,94 @@ public class AppServiceImpl implements IAppService {
         }).toList();
     }
 
+
+
+
+    @Override
+    public void syncMockApps(List<MockAppDto> mockAppDtos) {
+        for (MockAppDto mockAppDto : mockAppDtos) {
+            MockApp mockApp = mockAppRepository.findByAppId(mockAppDto.getAppId()).orElse(new MockApp());
+            boolean isNew = mockApp.getId() == null;
+            mapMockApp(mockAppDto, mockApp);
+
+            if (isNew) {
+                mockApp.setCreatedAt(LocalDateTime.now());
+                mockApp.setCreatedBy(mockAppDto.getCreatedBy());
+            } else {
+                mockApp.setUpdatedAt(LocalDateTime.now());
+                mockApp.setUpdatedBy(mockAppDto.getUpdatedBy());
+            }
+
+            mockAppRepository.save(mockApp);
+        }
+    }
+
+    @Override
+    public void createMockApp(MockAppDto mockAppDto) {
+        MockApp mockApp = new MockApp();
+        mapMockApp(mockAppDto, mockApp);
+        mockApp.setCreatedAt(LocalDateTime.now());
+        mockApp.setCreatedBy(mockAppDto.getCreatedBy());
+        mockAppRepository.save(mockApp);
+    }
+
+    @Override
+    public void updateMockApp(String appId, MockAppDto mockAppDto) {
+        MockApp mockApp = mockAppRepository.findByAppId(appId)
+                .orElseThrow(() -> new ResourceNotFoundException("MockApp", "appId", appId));
+        mockAppDto.setAppId(appId);
+        mapMockApp(mockAppDto, mockApp);
+        mockApp.setUpdatedAt(LocalDateTime.now());
+        mockApp.setUpdatedBy(mockAppDto.getUpdatedBy());
+        mockAppRepository.save(mockApp);
+    }
+
+    @Override
+    public void deleteMockApp(String appId) {
+        MockApp mockApp = mockAppRepository.findByAppId(appId)
+                .orElseThrow(() -> new ResourceNotFoundException("MockApp", "appId", appId));
+        mockAppRepository.delete(mockApp);
+    }
+
+    @Override
+    public MockAppDto fetchMockApp(String appId) {
+        MockApp mockApp = mockAppRepository.findByAppId(appId)
+                .orElseThrow(() -> new ResourceNotFoundException("MockApp", "appId", appId));
+        return mapMockAppDto(mockApp);
+    }
+
+    @Override
+    public List<MockAppDto> fetchAllMockApps() {
+        return mockAppRepository.findAll()
+                .stream()
+                .map(this::mapMockAppDto)
+                .toList();
+    }
+
+    private void mapMockApp(MockAppDto mockAppDto, MockApp mockApp) {
+        mockApp.setAppId(mockAppDto.getAppId());
+        mockApp.setName(mockAppDto.getName());
+        mockApp.setDescription(mockAppDto.getDescription());
+        mockApp.setRole(mockAppDto.getRole());
+        mockApp.setAudience(mockAppDto.getAudience());
+        mockApp.setApplicationType(mockAppDto.getApplicationType());
+        mockApp.setFormId(mockAppDto.getFormId());
+        mockApp.setPageMessage(mockAppDto.getPageMessage());
+        mockApp.setWorkflowId(mockAppDto.getWorkflowId());
+    }
+
+    private MockAppDto mapMockAppDto(MockApp mockApp) {
+        MockAppDto mockAppDto = new MockAppDto();
+        mockAppDto.setAppId(mockApp.getAppId());
+        mockAppDto.setName(mockApp.getName());
+        mockAppDto.setDescription(mockApp.getDescription());
+        mockAppDto.setRole(mockApp.getRole());
+        mockAppDto.setAudience(mockApp.getAudience());
+        mockAppDto.setApplicationType(mockApp.getApplicationType());
+        mockAppDto.setFormId(mockApp.getFormId());
+        mockAppDto.setPageMessage(mockApp.getPageMessage());
+        mockAppDto.setWorkflowId(mockApp.getWorkflowId());
+        return mockAppDto;
+    }
 
 }

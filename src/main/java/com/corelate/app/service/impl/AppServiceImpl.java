@@ -5,12 +5,14 @@ import com.corelate.app.dto.*;
 import com.corelate.app.entity.FormData;
 import com.corelate.app.entity.FormDataEntity;
 import com.corelate.app.entity.ListData;
+import com.corelate.app.entity.MockApp;
 import com.corelate.app.entity.PublishLog;
 import com.corelate.app.exeption.ResourceNotFoundException;
 import com.corelate.app.mapper.AppMapper;
 import com.corelate.app.repository.FormDataEntityRepository;
 import com.corelate.app.repository.FormDataRepository;
 import com.corelate.app.repository.ListRepository;
+import com.corelate.app.repository.MockAppRepository;
 import com.corelate.app.repository.PublishLogsRepository;
 import com.corelate.app.service.IAppService;
 import com.corelate.app.service.client.AppFeignClient;
@@ -41,6 +43,7 @@ public class AppServiceImpl implements IAppService {
     private FormDataRepository formDataRepository;
     private FormDataEntityRepository formDataEntityRepository;
     private PublishLogsRepository publishLogsRepository;
+    private MockAppRepository mockAppRepository;
     private AppFeignClient appFeignClient;
     private final StreamBridge streamBridge;
 
@@ -216,5 +219,35 @@ public class AppServiceImpl implements IAppService {
         }).toList();
     }
 
+
+
+
+    @Override
+    public void syncMockApps(List<MockAppDto> mockAppDtos) {
+        for (MockAppDto mockAppDto : mockAppDtos) {
+            MockApp mockApp = mockAppRepository.findByAppId(mockAppDto.getAppId())
+                    .orElse(new MockApp());
+
+            mockApp.setAppId(mockAppDto.getAppId());
+            mockApp.setName(mockAppDto.getName());
+            mockApp.setDescription(mockAppDto.getDescription());
+            mockApp.setRole(mockAppDto.getRole());
+            mockApp.setAudience(mockAppDto.getAudience());
+            mockApp.setApplicationType(mockAppDto.getApplicationType());
+            mockApp.setFormId(mockAppDto.getFormId());
+            mockApp.setPageMessage(mockAppDto.getPageMessage());
+            mockApp.setWorkflowId(mockAppDto.getWorkflowId());
+
+            if (mockApp.getId() == null) {
+                mockApp.setCreatedAt(LocalDateTime.now());
+                mockApp.setCreatedBy(mockAppDto.getCreatedBy());
+            } else {
+                mockApp.setUpdatedAt(LocalDateTime.now());
+                mockApp.setUpdatedBy(mockAppDto.getUpdatedBy());
+            }
+
+            mockAppRepository.save(mockApp);
+        }
+    }
 
 }

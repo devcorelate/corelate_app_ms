@@ -232,32 +232,4 @@ public class AppController {
         return ResponseEntity.status(HttpStatus.OK).body(ListDtos);
     }
 
-    @Operation(
-            summary = "Sync Mock Apps REST API",
-            description = "REST API to sync MockApp dataset into database"
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "HTTP Status OK"
-            ),
-            @ApiResponse(
-                    responseCode = "500",
-                    description = "HTTP Status Internal Server Error",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponseDto.class)
-                    )
-            )
-    }
-    )
-    @PostMapping("/sync")
-    public ResponseEntity<ResponseDto> syncMockApps(@RequestBody List<MockAppDto> mockAppDtos) {
-        logger.debug("syncMockApps method start");
-        iAppService.syncMockApps(mockAppDtos);
-        logger.debug("syncMockApps method end");
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(new ResponseDto(AppConstants.STATUS_200, AppConstants.MESSAGE_200));
-    }
-
 }

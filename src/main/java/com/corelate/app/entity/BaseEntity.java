@@ -17,6 +17,9 @@ public class BaseEntity {
     @Column(updatable = false)
     private String createdBy;
 
+    @Column(updatable = false)
+    private String createdByEmail;
+
     @Column(insertable = false)
     private LocalDateTime updatedAt;
 

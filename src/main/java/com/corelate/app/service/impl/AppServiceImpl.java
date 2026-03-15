@@ -284,6 +284,8 @@ public class AppServiceImpl implements IAppService {
     }
 
     private void mapMockApp(MockAppDto mockAppDto, MockApp mockApp) {
+        mockApp.setCreatedByEmail(mockAppDto.getCreatedByEmail());
+        mockApp.setCreatedBy(mockAppDto.getCreatedBy());
         mockApp.setAppId(mockAppDto.getAppId());
         mockApp.setName(mockAppDto.getName());
         mockApp.setDescription(mockAppDto.getDescription());
@@ -306,6 +308,8 @@ public class AppServiceImpl implements IAppService {
         mockAppDto.setFormId(mockApp.getFormId());
         mockAppDto.setPageMessage(mockApp.getPageMessage());
         mockAppDto.setWorkflowId(mockApp.getWorkflowId());
+        mockAppDto.setCreatedBy(mockApp.getCreatedBy());
+        mockAppDto.setCreatedByEmail(mockApp.getCreatedByEmail());
         return mockAppDto;
     }
 

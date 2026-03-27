@@ -1,13 +1,14 @@
 package com.corelate.app.entity;
 
-import com.fasterxml.jackson.databind.ser.Serializers;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import java.util.Map;
 
 @Entity
 @Table(name = "form_data_entity")
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class FormDataEntity extends BaseEntity {
 
 	@Id

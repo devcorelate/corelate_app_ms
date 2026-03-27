@@ -5,6 +5,7 @@ import lombok.*;
 
 @Entity
 @Getter @Setter @ToString @AllArgsConstructor @NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 public class ListData extends BaseEntity{
 
     @Id

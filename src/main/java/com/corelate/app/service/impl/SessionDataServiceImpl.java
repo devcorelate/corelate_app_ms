@@ -34,23 +34,9 @@ public class SessionDataServiceImpl implements ISessionDataService {
     @Override
     @Transactional
     public void addSessionData(SessionDataDto sessionDataDto) {
-        SessionData sessionData = sessionDataRepository.findBySessionId(sessionDataDto.getSessionId())
-                .map(existingData -> {
-                    resetSteps(existingData);
-                    sessionDataRepository.flush();
-                    mapToEntity(sessionDataDto, existingData);
-                    existingData.setUpdatedAt(LocalDateTime.now());
-                    existingData.setUpdatedBy(sessionDataDto.getUpdatedBy());
-                    return existingData;
-                })
-                .orElseGet(() -> {
-                    SessionData newSessionData = mapToEntity(sessionDataDto, new SessionData());
-                    newSessionData.setCreatedAt(LocalDateTime.now());
-                    newSessionData.setCreatedBy(sessionDataDto.getCreatedBy());
-                    return newSessionData;
-                });
-
-        sessionDataRepository.save(sessionData);
+        sessionDataRepository.findBySessionId(sessionDataDto.getSessionId())
+                .ifPresentOrElse(existingData -> replaceSessionData(existingData, sessionDataDto),
+                        () -> createSessionData(sessionDataDto));
     }
 
     @Override
@@ -60,12 +46,7 @@ public class SessionDataServiceImpl implements ISessionDataService {
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
 
         sessionDataDto.setSessionId(sessionId);
-        resetSteps(existingData);
-        sessionDataRepository.flush();
-        mapToEntity(sessionDataDto, existingData);
-        existingData.setUpdatedAt(LocalDateTime.now());
-        existingData.setUpdatedBy(sessionDataDto.getUpdatedBy());
-        sessionDataRepository.save(existingData);
+        replaceSessionData(existingData, sessionDataDto);
     }
 
     @Override
@@ -97,6 +78,25 @@ public class SessionDataServiceImpl implements ISessionDataService {
         SessionData sessionData = sessionDataRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
         return mapToDto(sessionData);
+    }
+
+    private void createSessionData(SessionDataDto sessionDataDto) {
+        SessionData newSessionData = mapToEntity(sessionDataDto, new SessionData());
+        newSessionData.setCreatedAt(LocalDateTime.now());
+        newSessionData.setCreatedBy(sessionDataDto.getCreatedBy());
+        sessionDataRepository.save(newSessionData);
+    }
+
+    private void replaceSessionData(SessionData existingData, SessionDataDto sessionDataDto) {
+        sessionDataRepository.delete(existingData);
+        sessionDataRepository.flush();
+
+        SessionData replacedData = mapToEntity(sessionDataDto, new SessionData());
+        replacedData.setCreatedAt(existingData.getCreatedAt());
+        replacedData.setCreatedBy(existingData.getCreatedBy());
+        replacedData.setUpdatedAt(LocalDateTime.now());
+        replacedData.setUpdatedBy(sessionDataDto.getUpdatedBy());
+        sessionDataRepository.save(replacedData);
     }
 
     private SessionData mapToEntity(SessionDataDto sessionDataDto, SessionData sessionData) {
@@ -133,22 +133,10 @@ public class SessionDataServiceImpl implements ISessionDataService {
         return sessionData;
     }
 
-
-
-    private void resetSteps(SessionData sessionData) {
-        sessionData.getSteps().forEach(step -> {
-            if (step.getSessionElementData() != null) {
-                step.getSessionElementData().setSessionStep(null);
-                step.setSessionElementData(null);
-            }
-            step.setSessionData(null);
-        });
-        sessionData.getSteps().clear();
-    }
-
     private boolean shouldIncludeSessionElementData(JsonNode data) {
         return data != null && !data.has("reviewMarks");
     }
+
     private String toJson(Object object) {
         if (object == null) {
             return null;

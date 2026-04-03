@@ -65,3 +65,19 @@ jobs:
           echo "  - ${{ steps.meta.outputs.sha_short }} (short commit SHA)"
           echo "  - ${{ steps.meta.outputs.branch }}-${{ steps.meta.outputs.timestamp }} (branch + timestamp)"
           echo "  - ${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.build_number }}-${{ steps.meta.outputs.sha_short }} (version + build + SHA)"
+
+      - name: Update K8s Manifest
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.MANIFEST_REPO_TOKEN }}
+        run: |
+          git clone https://x-access-token:${GH_TOKEN}@github.com/CORELATESYSCORP/bpmn-k8s-manifests.git /tmp/manifests
+          cd /tmp/manifests
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B deploy/list-ms
+          sed -i "s|image:.*bpmn/corelate_list_ms:.*|image: 689635266888.dkr.ecr.ap-southeast-1.amazonaws.com/bpmn/corelate_list_ms:${{ github.sha }}|" base/services/list-ms/deployment.yaml
+          git add base/services/list-ms/deployment.yaml
+          git commit -m "deploy(list-ms): ${{ github.sha }}"
+          git push -f origin deploy/list-ms
+          gh pr create --repo CORELATESYSCORP/bpmn-k8s-manifests --base main --head deploy/list-ms --title "deploy(list-ms): ${{ github.sha }}" --body "Automated image update for list-ms" || true

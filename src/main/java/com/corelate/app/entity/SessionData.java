@@ -3,6 +3,8 @@ package com.corelate.app.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "session_data")
@@ -24,8 +26,8 @@ public class SessionData extends BaseEntity {
 
     private String currentNodeId;
 
-    @Column(columnDefinition = "TEXT")
-    private String steps;
+    @OneToMany(mappedBy = "sessionData", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SessionStep> steps = new ArrayList<>();
 
     @Column(columnDefinition = "TEXT")
     private String gatewayDecisions;

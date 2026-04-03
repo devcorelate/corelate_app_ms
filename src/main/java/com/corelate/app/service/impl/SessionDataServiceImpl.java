@@ -2,6 +2,8 @@ package com.corelate.app.service.impl;
 
 import com.corelate.app.dto.SessionDataDto;
 import com.corelate.app.entity.SessionData;
+import com.corelate.app.entity.SessionElementData;
+import com.corelate.app.entity.SessionStep;
 import com.corelate.app.exeption.ResourceNotFoundException;
 import com.corelate.app.repository.SessionDataRepository;
 import com.corelate.app.service.ISessionDataService;
@@ -16,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class SessionDataServiceImpl implements ISessionDataService {
@@ -29,30 +32,35 @@ public class SessionDataServiceImpl implements ISessionDataService {
     }
 
     @Override
+    @Transactional
     public void addSessionData(SessionDataDto sessionDataDto) {
-        SessionData sessionData = mapToEntity(sessionDataDto, new SessionData());
-        sessionData.setCreatedAt(LocalDateTime.now());
-        sessionData.setCreatedBy(sessionDataDto.getCreatedBy());
-        sessionDataRepository.save(sessionData);
+        sessionDataRepository.findBySessionId(sessionDataDto.getSessionId())
+                .ifPresentOrElse(existingData -> replaceSessionData(existingData, sessionDataDto),
+                        () -> createSessionData(sessionDataDto));
     }
 
     @Override
+    @Transactional
     public void updateSessionData(String sessionId, SessionDataDto sessionDataDto) {
         SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
 
         sessionDataDto.setSessionId(sessionId);
-        mapToEntity(sessionDataDto, existingData);
-        existingData.setUpdatedAt(LocalDateTime.now());
-        existingData.setUpdatedBy(sessionDataDto.getUpdatedBy());
-        sessionDataRepository.save(existingData);
+        replaceSessionData(existingData, sessionDataDto);
     }
 
     @Override
+    @Transactional
     public void deleteSessionData(String sessionId) {
         SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
         sessionDataRepository.delete(existingData);
+    }
+
+    @Override
+    @Transactional
+    public void deleteAllSessionData() {
+        sessionDataRepository.deleteAll();
     }
 
     @Override
@@ -72,6 +80,25 @@ public class SessionDataServiceImpl implements ISessionDataService {
         return mapToDto(sessionData);
     }
 
+    private void createSessionData(SessionDataDto sessionDataDto) {
+        SessionData newSessionData = mapToEntity(sessionDataDto, new SessionData());
+        newSessionData.setCreatedAt(LocalDateTime.now());
+        newSessionData.setCreatedBy(sessionDataDto.getCreatedBy());
+        sessionDataRepository.save(newSessionData);
+    }
+
+    private void replaceSessionData(SessionData existingData, SessionDataDto sessionDataDto) {
+        sessionDataRepository.delete(existingData);
+        sessionDataRepository.flush();
+
+        SessionData replacedData = mapToEntity(sessionDataDto, new SessionData());
+        replacedData.setCreatedAt(existingData.getCreatedAt());
+        replacedData.setCreatedBy(existingData.getCreatedBy());
+        replacedData.setUpdatedAt(LocalDateTime.now());
+        replacedData.setUpdatedBy(sessionDataDto.getUpdatedBy());
+        sessionDataRepository.save(replacedData);
+    }
+
     private SessionData mapToEntity(SessionDataDto sessionDataDto, SessionData sessionData) {
         sessionData.setSessionId(sessionDataDto.getSessionId());
         sessionData.setWorkflowId(sessionDataDto.getWorkflowId());
@@ -79,9 +106,35 @@ public class SessionDataServiceImpl implements ISessionDataService {
         sessionData.setLastUpdatedAt(sessionDataDto.getLastUpdatedAt());
         sessionData.setCurrentNodeId(sessionDataDto.getCurrentNodeId());
         sessionData.setReturnTo(sessionDataDto.getReturnTo());
-        sessionData.setSteps(toJson(sessionDataDto.getSteps()));
         sessionData.setGatewayDecisions(toJson(sessionDataDto.getGatewayDecisions()));
+
+        if (sessionDataDto.getSteps() != null) {
+            sessionDataDto.getSteps().forEach((stepKey, stepDto) -> {
+                SessionStep sessionStep = new SessionStep();
+                sessionStep.setStepKey(stepKey);
+                sessionStep.setElementId(stepDto.getElementId());
+                sessionStep.setElementType(stepDto.getElementType());
+                sessionStep.setStatus(stepDto.getStatus());
+                sessionStep.setCompletedAt(stepDto.getCompletedAt());
+                sessionStep.setSessionData(sessionData);
+
+                if (shouldIncludeSessionElementData(stepDto.getData())) {
+                    SessionElementData sessionElementData = new SessionElementData();
+                    sessionElementData.setWorkflowId(sessionDataDto.getWorkflowId());
+                    sessionElementData.setData(stepDto.getData());
+                    sessionElementData.setSessionStep(sessionStep);
+                    sessionStep.setSessionElementData(sessionElementData);
+                }
+
+                sessionData.getSteps().add(sessionStep);
+            });
+        }
+
         return sessionData;
+    }
+
+    private boolean shouldIncludeSessionElementData(JsonNode data) {
+        return data != null && !data.has("reviewMarks");
     }
 
     private String toJson(Object object) {
@@ -108,16 +161,22 @@ public class SessionDataServiceImpl implements ISessionDataService {
         return dto;
     }
 
-    private Map<String, SessionDataDto.SessionStepDto> toStepMap(String json) {
-        if (json == null || json.isBlank()) {
+    private Map<String, SessionDataDto.SessionStepDto> toStepMap(List<SessionStep> steps) {
+        if (steps == null || steps.isEmpty()) {
             return Collections.emptyMap();
         }
-        try {
-            return objectMapper.readValue(json, new TypeReference<>() {
-            });
-        } catch (JsonProcessingException ex) {
-            throw new IllegalArgumentException("Invalid steps JSON stored for SessionData", ex);
-        }
+
+        return steps.stream().collect(Collectors.toMap(SessionStep::getStepKey, step -> {
+            SessionDataDto.SessionStepDto stepDto = new SessionDataDto.SessionStepDto();
+            stepDto.setElementId(step.getElementId());
+            stepDto.setElementType(step.getElementType());
+            stepDto.setStatus(step.getStatus());
+            stepDto.setCompletedAt(step.getCompletedAt());
+            if (step.getSessionElementData() != null) {
+                stepDto.setData(step.getSessionElementData().getData());
+            }
+            return stepDto;
+        }));
     }
 
     private Map<String, JsonNode> toGatewayDecisionMap(String json) {

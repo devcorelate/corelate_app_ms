@@ -73,6 +73,12 @@ public class SessionDataServiceImpl implements ISessionDataService {
     }
 
     @Override
+    @Transactional
+    public void deleteAllSessionData() {
+        sessionDataRepository.deleteAll();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<SessionDataDto> fetchAllSessionData() {
         return sessionDataRepository.findAll()

@@ -32,6 +32,7 @@ public class SessionDataServiceImpl implements ISessionDataService {
     }
 
     @Override
+    @Transactional
     public void addSessionData(SessionDataDto sessionDataDto) {
         SessionData sessionData = mapToEntity(sessionDataDto, new SessionData());
         sessionData.setCreatedAt(LocalDateTime.now());
@@ -40,11 +41,14 @@ public class SessionDataServiceImpl implements ISessionDataService {
     }
 
     @Override
+    @Transactional
     public void updateSessionData(String sessionId, SessionDataDto sessionDataDto) {
         SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
 
         sessionDataDto.setSessionId(sessionId);
+        resetSteps(existingData);
+        sessionDataRepository.flush();
         mapToEntity(sessionDataDto, existingData);
         existingData.setUpdatedAt(LocalDateTime.now());
         existingData.setUpdatedBy(sessionDataDto.getUpdatedBy());
@@ -90,7 +94,6 @@ public class SessionDataServiceImpl implements ISessionDataService {
         sessionData.setCurrentNodeId(sessionDataDto.getCurrentNodeId());
         sessionData.setReturnTo(sessionDataDto.getReturnTo());
         sessionData.setGatewayDecisions(toJson(sessionDataDto.getGatewayDecisions()));
-        sessionData.getSteps().clear();
 
         if (sessionDataDto.getSteps() != null) {
             sessionDataDto.getSteps().forEach((stepKey, stepDto) -> {
@@ -117,6 +120,18 @@ public class SessionDataServiceImpl implements ISessionDataService {
         return sessionData;
     }
 
+
+
+    private void resetSteps(SessionData sessionData) {
+        sessionData.getSteps().forEach(step -> {
+            if (step.getSessionElementData() != null) {
+                step.getSessionElementData().setSessionStep(null);
+                step.setSessionElementData(null);
+            }
+            step.setSessionData(null);
+        });
+        sessionData.getSteps().clear();
+    }
 
     private boolean shouldIncludeSessionElementData(JsonNode data) {
         return data != null && !data.has("reviewMarks");

@@ -1,0 +1,68 @@
+package com.corelate.app.service.impl;
+
+import com.corelate.app.entity.SessionElementData;
+import com.corelate.app.exeption.ResourceNotFoundException;
+import com.corelate.app.repository.SessionElementDataRepository;
+import com.corelate.app.service.ISessionElementDataService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class SessionElementDataServiceImpl implements ISessionElementDataService {
+
+    private final SessionElementDataRepository sessionElementDataRepository;
+
+    public SessionElementDataServiceImpl(SessionElementDataRepository sessionElementDataRepository) {
+        this.sessionElementDataRepository = sessionElementDataRepository;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<JsonNode> fetchAllData() {
+        return sessionElementDataRepository.findAll()
+                .stream()
+                .map(SessionElementData::getData)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<JsonNode> fetchAllDataByWorkflowId(String workflowId) {
+        List<SessionElementData> dataList = sessionElementDataRepository.findByWorkflowId(workflowId);
+        if (dataList.isEmpty()) {
+            throw new ResourceNotFoundException("SessionElementData", "workflowId", workflowId);
+        }
+        return dataList.stream().map(SessionElementData::getData).toList();
+    }
+
+    @Override
+    @Transactional
+    public List<JsonNode> updateDataByWorkflowId(String workflowId, Map<String, JsonNode> updates) {
+        List<SessionElementData> dataList = sessionElementDataRepository.findByWorkflowId(workflowId);
+        if (dataList.isEmpty()) {
+            throw new ResourceNotFoundException("SessionElementData", "workflowId", workflowId);
+        }
+
+        dataList.forEach(sessionElementData -> applyUpdates(sessionElementData.getData(), updates));
+        sessionElementDataRepository.saveAll(dataList);
+
+        return dataList.stream().map(SessionElementData::getData).toList();
+    }
+
+    private void applyUpdates(JsonNode data, Map<String, JsonNode> updates) {
+        if (!(data instanceof ObjectNode objectNode) || updates == null || updates.isEmpty()) {
+            return;
+        }
+
+        updates.forEach((id, value) -> {
+            if (objectNode.has(id)) {
+                objectNode.set(id, value);
+            }
+        });
+    }
+}

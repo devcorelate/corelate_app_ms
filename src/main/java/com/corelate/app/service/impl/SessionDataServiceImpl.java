@@ -19,12 +19,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 public class SessionDataServiceImpl implements ISessionDataService {
 
     private final SessionDataRepository sessionDataRepository;
     private final ObjectMapper objectMapper;
+    private final ConcurrentMap<String, Object> sessionLocks = new ConcurrentHashMap<>();
 
     public SessionDataServiceImpl(SessionDataRepository sessionDataRepository, ObjectMapper objectMapper) {
         this.sessionDataRepository = sessionDataRepository;
@@ -34,27 +37,39 @@ public class SessionDataServiceImpl implements ISessionDataService {
     @Override
     @Transactional
     public void addSessionData(SessionDataDto sessionDataDto) {
-        sessionDataRepository.findBySessionId(sessionDataDto.getSessionId())
-                .ifPresentOrElse(existingData -> replaceSessionData(existingData, sessionDataDto),
-                        () -> createSessionData(sessionDataDto));
+        synchronized (getSessionLock(sessionDataDto.getSessionId())) {
+            sessionDataRepository.findBySessionId(sessionDataDto.getSessionId())
+                    .ifPresentOrElse(existingData -> replaceSessionData(existingData, sessionDataDto),
+                            () -> createSessionData(sessionDataDto));
+        }
     }
 
     @Override
     @Transactional
     public void updateSessionData(String sessionId, SessionDataDto sessionDataDto) {
-        SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
+        synchronized (getSessionLock(sessionId)) {
+            SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
 
-        sessionDataDto.setSessionId(sessionId);
-        replaceSessionData(existingData, sessionDataDto);
+            sessionDataDto.setSessionId(sessionId);
+            replaceSessionData(existingData, sessionDataDto);
+        }
     }
 
     @Override
     @Transactional
     public void deleteSessionData(String sessionId) {
-        SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
-        sessionDataRepository.delete(existingData);
+        synchronized (getSessionLock(sessionId)) {
+            SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
+            sessionDataRepository.delete(existingData);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void deleteAllSessionData() {
+        sessionDataRepository.deleteAll();
     }
 
     @Override
@@ -97,6 +112,10 @@ public class SessionDataServiceImpl implements ISessionDataService {
         replacedData.setUpdatedAt(LocalDateTime.now());
         replacedData.setUpdatedBy(sessionDataDto.getUpdatedBy());
         sessionDataRepository.save(replacedData);
+    }
+
+    private Object getSessionLock(String sessionId) {
+        return sessionLocks.computeIfAbsent(sessionId, key -> new Object());
     }
 
     private SessionData mapToEntity(SessionDataDto sessionDataDto, SessionData sessionData) {

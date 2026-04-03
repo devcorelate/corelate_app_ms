@@ -52,10 +52,17 @@ public class SessionDataServiceImpl implements ISessionDataService {
     }
 
     @Override
+    @Transactional
     public void deleteSessionData(String sessionId) {
         SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
         sessionDataRepository.delete(existingData);
+    }
+
+    @Override
+    @Transactional
+    public void deleteAllSessionData() {
+        sessionDataRepository.deleteAll();
     }
 
     @Override
@@ -95,12 +102,14 @@ public class SessionDataServiceImpl implements ISessionDataService {
                 sessionStep.setCompletedAt(stepDto.getCompletedAt());
                 sessionStep.setSessionData(sessionData);
 
-                SessionElementData sessionElementData = new SessionElementData();
-                sessionElementData.setWorkflowId(sessionDataDto.getWorkflowId());
-                sessionElementData.setData(stepDto.getData());
-                sessionElementData.setSessionStep(sessionStep);
+                if (shouldIncludeSessionElementData(stepDto.getData())) {
+                    SessionElementData sessionElementData = new SessionElementData();
+                    sessionElementData.setWorkflowId(sessionDataDto.getWorkflowId());
+                    sessionElementData.setData(stepDto.getData());
+                    sessionElementData.setSessionStep(sessionStep);
+                    sessionStep.setSessionElementData(sessionElementData);
+                }
 
-                sessionStep.setSessionElementData(sessionElementData);
                 sessionData.getSteps().add(sessionStep);
             });
         }
@@ -108,6 +117,10 @@ public class SessionDataServiceImpl implements ISessionDataService {
         return sessionData;
     }
 
+
+    private boolean shouldIncludeSessionElementData(JsonNode data) {
+        return data != null && !data.has("reviewMarks");
+    }
     private String toJson(Object object) {
         if (object == null) {
             return null;

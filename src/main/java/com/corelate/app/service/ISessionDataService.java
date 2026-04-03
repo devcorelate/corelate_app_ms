@@ -12,6 +12,8 @@ public interface ISessionDataService {
 
     void deleteSessionData(String sessionId);
 
+    void deleteAllSessionData();
+
     List<SessionDataDto> fetchAllSessionData();
 
     SessionDataDto fetchSessionDataById(String sessionId);

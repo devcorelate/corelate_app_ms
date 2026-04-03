@@ -81,6 +81,20 @@ public class SessionDataController {
                 .body(new ResponseDto(AppConstants.STATUS_200, AppConstants.MESSAGE_200));
     }
 
+    @Operation(summary = "Delete all Session Data REST API", description = "REST API to delete all SessionData")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "HTTP Status OK"),
+            @ApiResponse(responseCode = "500", description = "HTTP Status Internal Server Error", content = @Content(schema = @Schema(implementation = com.corelate.app.dto.ErrorResponseDto.class)))
+    })
+    @DeleteMapping("/delete/all")
+    public ResponseEntity<ResponseDto> deleteAllSessionData() {
+        logger.debug("deleteAllSessionData method start");
+        sessionDataService.deleteAllSessionData();
+        logger.debug("deleteAllSessionData method end");
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(new ResponseDto(AppConstants.STATUS_200, AppConstants.MESSAGE_200));
+    }
+
     @Operation(summary = "Fetch All Session Data REST API", description = "REST API to fetch all SessionData")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "HTTP Status OK"),

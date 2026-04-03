@@ -34,9 +34,22 @@ public class SessionDataServiceImpl implements ISessionDataService {
     @Override
     @Transactional
     public void addSessionData(SessionDataDto sessionDataDto) {
-        SessionData sessionData = mapToEntity(sessionDataDto, new SessionData());
-        sessionData.setCreatedAt(LocalDateTime.now());
-        sessionData.setCreatedBy(sessionDataDto.getCreatedBy());
+        SessionData sessionData = sessionDataRepository.findBySessionId(sessionDataDto.getSessionId())
+                .map(existingData -> {
+                    resetSteps(existingData);
+                    sessionDataRepository.flush();
+                    mapToEntity(sessionDataDto, existingData);
+                    existingData.setUpdatedAt(LocalDateTime.now());
+                    existingData.setUpdatedBy(sessionDataDto.getUpdatedBy());
+                    return existingData;
+                })
+                .orElseGet(() -> {
+                    SessionData newSessionData = mapToEntity(sessionDataDto, new SessionData());
+                    newSessionData.setCreatedAt(LocalDateTime.now());
+                    newSessionData.setCreatedBy(sessionDataDto.getCreatedBy());
+                    return newSessionData;
+                });
+
         sessionDataRepository.save(sessionData);
     }
 

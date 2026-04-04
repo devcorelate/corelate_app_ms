@@ -1,6 +1,9 @@
 package com.corelate.app.exeption;
 
 import com.corelate.app.dto.ErrorResponseDto;
+import com.corelate.app.dto.SessionUpdateConflictResponseDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -20,6 +23,7 @@ import java.util.Map;
 
 @ControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
@@ -62,6 +66,31 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         );
 
         return new ResponseEntity<>(errorResponseDto, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(SessionIdMismatchException.class)
+    public ResponseEntity<ErrorResponseDto> handleSessionIdMismatchException(SessionIdMismatchException exception,
+                                                                             WebRequest webRequest) {
+        ErrorResponseDto errorResponseDto = new ErrorResponseDto(
+                webRequest.getDescription(false),
+                HttpStatus.BAD_REQUEST,
+                exception.getMessage(),
+                LocalDateTime.now()
+        );
+        return new ResponseEntity<>(errorResponseDto, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(SessionUpdateConflictException.class)
+    public ResponseEntity<SessionUpdateConflictResponseDto> handleSessionUpdateConflict(
+            SessionUpdateConflictException exception) {
+        logger.warn("Optimistic locking conflict for sessionId={}", exception.getSessionId());
+        SessionUpdateConflictResponseDto body = new SessionUpdateConflictResponseDto(
+                "SESSION_UPDATE_CONFLICT",
+                "Session was modified by another transaction.",
+                exception.getSessionId(),
+                LocalDateTime.now()
+        );
+        return new ResponseEntity<>(body, HttpStatus.CONFLICT);
     }
 
 //    @ExceptionHandler(TemplateAlreadyExistsException.class)

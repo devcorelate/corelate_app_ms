@@ -4,13 +4,22 @@ import com.corelate.app.dto.SessionDataDto;
 import com.corelate.app.entity.SessionData;
 import com.corelate.app.entity.SessionElementData;
 import com.corelate.app.entity.SessionStep;
+import com.corelate.app.exeption.SessionIdMismatchException;
 import com.corelate.app.exeption.ResourceNotFoundException;
+import com.corelate.app.exeption.SessionUpdateConflictException;
 import com.corelate.app.repository.SessionDataRepository;
 import com.corelate.app.service.ISessionDataService;
+import com.corelate.app.service.SessionUpdateSynchronizationHook;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.OptimisticLockException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +31,17 @@ import java.util.stream.Collectors;
 
 @Service
 public class SessionDataServiceImpl implements ISessionDataService {
+    private static final Logger logger = LoggerFactory.getLogger(SessionDataServiceImpl.class);
 
     private final SessionDataRepository sessionDataRepository;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<SessionUpdateSynchronizationHook> synchronizationHookProvider;
 
-    public SessionDataServiceImpl(SessionDataRepository sessionDataRepository, ObjectMapper objectMapper) {
+    public SessionDataServiceImpl(SessionDataRepository sessionDataRepository, ObjectMapper objectMapper,
+                                  ObjectProvider<SessionUpdateSynchronizationHook> synchronizationHookProvider) {
         this.sessionDataRepository = sessionDataRepository;
         this.objectMapper = objectMapper;
+        this.synchronizationHookProvider = synchronizationHookProvider;
     }
 
     @Override
@@ -42,11 +55,24 @@ public class SessionDataServiceImpl implements ISessionDataService {
     @Override
     @Transactional
     public void updateSessionData(String sessionId, SessionDataDto sessionDataDto) {
+        validateSessionIdConsistency(sessionId, sessionDataDto);
         SessionData existingData = sessionDataRepository.findBySessionId(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", sessionId));
 
-        sessionDataDto.setSessionId(sessionId);
-        replaceSessionData(existingData, sessionDataDto);
+        SessionUpdateSynchronizationHook syncHook = synchronizationHookProvider.getIfAvailable();
+        if (syncHook != null) {
+            syncHook.afterLoadBeforeUpdate(sessionId);
+        }
+
+        try {
+            applyMutableFields(existingData, sessionDataDto);
+            existingData.setUpdatedAt(LocalDateTime.now());
+            existingData.setUpdatedBy(sessionDataDto.getUpdatedBy());
+            sessionDataRepository.saveAndFlush(existingData);
+        } catch (ObjectOptimisticLockingFailureException | OptimisticLockException ex) {
+            logger.warn("Session update conflict for sessionId={}, traceId={}", sessionId, getRequestCorrelationId());
+            throw new SessionUpdateConflictException(sessionId, ex);
+        }
     }
 
     @Override
@@ -88,15 +114,22 @@ public class SessionDataServiceImpl implements ISessionDataService {
     }
 
     private void replaceSessionData(SessionData existingData, SessionDataDto sessionDataDto) {
-        sessionDataRepository.delete(existingData);
-        sessionDataRepository.flush();
+        applyMutableFields(existingData, sessionDataDto);
+        existingData.setUpdatedAt(LocalDateTime.now());
+        existingData.setUpdatedBy(sessionDataDto.getUpdatedBy());
+        sessionDataRepository.save(existingData);
+    }
 
-        SessionData replacedData = mapToEntity(sessionDataDto, new SessionData());
-        replacedData.setCreatedAt(existingData.getCreatedAt());
-        replacedData.setCreatedBy(existingData.getCreatedBy());
-        replacedData.setUpdatedAt(LocalDateTime.now());
-        replacedData.setUpdatedBy(sessionDataDto.getUpdatedBy());
-        sessionDataRepository.save(replacedData);
+    private void applyMutableFields(SessionData existingData, SessionDataDto sessionDataDto) {
+        existingData.setSessionId(sessionDataDto.getSessionId());
+        existingData.setWorkflowId(sessionDataDto.getWorkflowId());
+        existingData.setStartedAt(sessionDataDto.getStartedAt());
+        existingData.setLastUpdatedAt(sessionDataDto.getLastUpdatedAt());
+        existingData.setCurrentNodeId(sessionDataDto.getCurrentNodeId());
+        existingData.setReturnTo(sessionDataDto.getReturnTo());
+        existingData.setGatewayDecisions(toJson(sessionDataDto.getGatewayDecisions()));
+        existingData.getSteps().clear();
+        mapSteps(sessionDataDto, existingData);
     }
 
     private SessionData mapToEntity(SessionDataDto sessionDataDto, SessionData sessionData) {
@@ -107,7 +140,11 @@ public class SessionDataServiceImpl implements ISessionDataService {
         sessionData.setCurrentNodeId(sessionDataDto.getCurrentNodeId());
         sessionData.setReturnTo(sessionDataDto.getReturnTo());
         sessionData.setGatewayDecisions(toJson(sessionDataDto.getGatewayDecisions()));
+        mapSteps(sessionDataDto, sessionData);
+        return sessionData;
+    }
 
+    private void mapSteps(SessionDataDto sessionDataDto, SessionData sessionData) {
         if (sessionDataDto.getSteps() != null) {
             sessionDataDto.getSteps().forEach((stepKey, stepDto) -> {
                 SessionStep sessionStep = new SessionStep();
@@ -129,8 +166,18 @@ public class SessionDataServiceImpl implements ISessionDataService {
                 sessionData.getSteps().add(sessionStep);
             });
         }
+    }
 
-        return sessionData;
+    private void validateSessionIdConsistency(String pathSessionId, SessionDataDto sessionDataDto) {
+        if (sessionDataDto.getSessionId() != null && !pathSessionId.equals(sessionDataDto.getSessionId())) {
+            throw new SessionIdMismatchException(pathSessionId, sessionDataDto.getSessionId());
+        }
+        sessionDataDto.setSessionId(pathSessionId);
+    }
+
+    private String getRequestCorrelationId() {
+        String traceId = MDC.get("trace_id");
+        return traceId != null ? traceId : "N/A";
     }
 
     private boolean shouldIncludeSessionElementData(JsonNode data) {

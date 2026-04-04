@@ -10,7 +10,7 @@ public interface ISessionElementDataService {
 
     List<JsonNode> fetchAllData();
 
-    List<Map<String, SessionElementDataWithLabelDto>> fetchAllDataWithLabel();
+    Map<String, List<SessionElementDataWithLabelDto>> fetchAllDataWithLabel();
 
     List<JsonNode> fetchAllDataByWorkflowId(String workflowId);
 

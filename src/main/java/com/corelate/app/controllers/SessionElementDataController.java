@@ -60,9 +60,9 @@ public class SessionElementDataController {
             @ApiResponse(responseCode = "500", description = "HTTP Status Internal Server Error", content = @Content(schema = @Schema(implementation = com.corelate.app.dto.ErrorResponseDto.class)))
     })
     @GetMapping("/fetch/data/all/with-label")
-    public ResponseEntity<List<Map<String, SessionElementDataWithLabelDto>>> fetchAllDataWithLabel() {
+    public ResponseEntity<Map<String, List<SessionElementDataWithLabelDto>>> fetchAllDataWithLabel() {
         logger.debug("fetchAllDataWithLabel method start");
-        List<Map<String, SessionElementDataWithLabelDto>> data = sessionElementDataService.fetchAllDataWithLabel();
+        Map<String, List<SessionElementDataWithLabelDto>> data = sessionElementDataService.fetchAllDataWithLabel();
         logger.debug("fetchAllDataWithLabel method end");
         return ResponseEntity.status(HttpStatus.OK).body(data);
     }

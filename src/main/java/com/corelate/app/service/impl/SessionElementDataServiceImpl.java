@@ -7,6 +7,7 @@ import com.corelate.app.repository.SessionElementDataRepository;
 import com.corelate.app.service.ISessionElementDataService;
 import com.corelate.app.service.client.FormFeignClient;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class SessionElementDataServiceImpl implements ISessionElementDataService {
@@ -23,11 +26,14 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
 
     private final SessionElementDataRepository sessionElementDataRepository;
     private final FormFeignClient formFeignClient;
+    private final ObjectMapper objectMapper;
 
     public SessionElementDataServiceImpl(SessionElementDataRepository sessionElementDataRepository,
-                                         FormFeignClient formFeignClient) {
+                                         FormFeignClient formFeignClient,
+                                         ObjectMapper objectMapper) {
         this.sessionElementDataRepository = sessionElementDataRepository;
         this.formFeignClient = formFeignClient;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -41,11 +47,14 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
 
     @Override
     @Transactional(readOnly = true)
-    public List<Map<String, SessionElementDataWithLabelDto>> fetchAllDataWithLabel() {
+    public Map<String, List<SessionElementDataWithLabelDto>> fetchAllDataWithLabel() {
         return sessionElementDataRepository.findAll()
                 .stream()
-                .map(this::mapToWorkflowDataWithLabelDto)
-                .toList();
+                .collect(Collectors.groupingBy(
+                        SessionElementData::getWorkflowId,
+                        LinkedHashMap::new,
+                        Collectors.mapping(this::mapToDataWithLabelDto, Collectors.toList())
+                ));
     }
 
     @Override
@@ -92,21 +101,38 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         return new SessionElementDataWithLabelDto(elementId, label, value);
     }
 
-    private Map<String, SessionElementDataWithLabelDto> mapToWorkflowDataWithLabelDto(SessionElementData sessionElementData) {
-        return Map.of(sessionElementData.getWorkflowId(), mapToDataWithLabelDto(sessionElementData));
-    }
-
     private String resolveLabel(String elementId) {
         if (elementId == null) {
             return null;
         }
 
         try {
-            return formFeignClient.fetchLabelByElementId(elementId);
+            return normalizeLabel(formFeignClient.fetchLabelByElementId(elementId));
         } catch (Exception exception) {
             logger.warn("Unable to fetch label from forms service for elementId={}", elementId, exception);
             return null;
         }
+    }
+
+    private String normalizeLabel(String rawLabelResponse) {
+        if (rawLabelResponse == null || rawLabelResponse.isBlank()) {
+            return rawLabelResponse;
+        }
+
+        String trimmedResponse = rawLabelResponse.trim();
+        if (!trimmedResponse.startsWith("{")) {
+            return rawLabelResponse;
+        }
+
+        try {
+            JsonNode labelResponseNode = objectMapper.readTree(trimmedResponse);
+            if (labelResponseNode.hasNonNull("label")) {
+                return labelResponseNode.get("label").asText();
+            }
+        } catch (Exception exception) {
+            logger.warn("Unable to parse label response from forms service: {}", rawLabelResponse, exception);
+        }
+        return rawLabelResponse;
     }
 
     private String extractElementId(JsonNode data, SessionElementData sessionElementData) {

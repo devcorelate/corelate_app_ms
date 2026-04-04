@@ -125,20 +125,20 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
 
     private String resolveLabel(String elementId) {
         if (elementId == null) {
-            return null;
+            return "none";
         }
 
         try {
             return normalizeLabel(formFeignClient.fetchLabelByElementId(elementId));
         } catch (Exception exception) {
             logger.warn("Unable to fetch label from forms service for elementId={}", elementId, exception);
-            return null;
+            return "none";
         }
     }
 
     private String normalizeLabel(String rawLabelResponse) {
         if (rawLabelResponse == null || rawLabelResponse.isBlank()) {
-            return rawLabelResponse;
+            return "none";
         }
 
         String trimmedResponse = rawLabelResponse.trim();
@@ -149,12 +149,14 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         try {
             JsonNode labelResponseNode = objectMapper.readTree(trimmedResponse);
             if (labelResponseNode.hasNonNull("label")) {
-                return labelResponseNode.get("label").asText();
+                String label = labelResponseNode.get("label").asText();
+                return label.isBlank() ? "none" : label;
             }
+            return "none";
         } catch (Exception exception) {
             logger.warn("Unable to parse label response from forms service: {}", rawLabelResponse, exception);
         }
-        return rawLabelResponse;
+        return "none";
     }
 
 }

@@ -2,6 +2,7 @@ package com.corelate.app.controllers;
 
 import com.corelate.app.constants.AppConstants;
 import com.corelate.app.dto.ResponseDto;
+import com.corelate.app.dto.SessionElementDataWithLabelDto;
 import com.corelate.app.service.ISessionElementDataService;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,6 +50,20 @@ public class SessionElementDataController {
         logger.debug("fetchAllData method start");
         List<JsonNode> data = sessionElementDataService.fetchAllData();
         logger.debug("fetchAllData method end");
+        return ResponseEntity.status(HttpStatus.OK).body(data);
+    }
+
+    @Operation(summary = "Fetch all SessionElementData payloads with labels",
+            description = "REST API to fetch all data payloads including id, label, and value")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "HTTP Status OK"),
+            @ApiResponse(responseCode = "500", description = "HTTP Status Internal Server Error", content = @Content(schema = @Schema(implementation = com.corelate.app.dto.ErrorResponseDto.class)))
+    })
+    @GetMapping("/fetch/data/all/with-label")
+    public ResponseEntity<List<SessionElementDataWithLabelDto>> fetchAllDataWithLabel() {
+        logger.debug("fetchAllDataWithLabel method start");
+        List<SessionElementDataWithLabelDto> data = sessionElementDataService.fetchAllDataWithLabel();
+        logger.debug("fetchAllDataWithLabel method end");
         return ResponseEntity.status(HttpStatus.OK).body(data);
     }
 

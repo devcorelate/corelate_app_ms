@@ -1,9 +1,11 @@
 package com.corelate.app.service.impl;
 
+import com.corelate.app.dto.SessionElementDataWithLabelDto;
 import com.corelate.app.entity.SessionElementData;
 import com.corelate.app.exeption.ResourceNotFoundException;
 import com.corelate.app.repository.SessionElementDataRepository;
 import com.corelate.app.service.ISessionElementDataService;
+import com.corelate.app.service.client.FormFeignClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
@@ -16,9 +18,12 @@ import java.util.Map;
 public class SessionElementDataServiceImpl implements ISessionElementDataService {
 
     private final SessionElementDataRepository sessionElementDataRepository;
+    private final FormFeignClient formFeignClient;
 
-    public SessionElementDataServiceImpl(SessionElementDataRepository sessionElementDataRepository) {
+    public SessionElementDataServiceImpl(SessionElementDataRepository sessionElementDataRepository,
+                                         FormFeignClient formFeignClient) {
         this.sessionElementDataRepository = sessionElementDataRepository;
+        this.formFeignClient = formFeignClient;
     }
 
     @Override
@@ -27,6 +32,15 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         return sessionElementDataRepository.findAll()
                 .stream()
                 .map(SessionElementData::getData)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SessionElementDataWithLabelDto> fetchAllDataWithLabel() {
+        return sessionElementDataRepository.findAll()
+                .stream()
+                .map(this::mapToDataWithLabelDto)
                 .toList();
     }
 
@@ -64,5 +78,13 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
                 objectNode.set(id, value);
             }
         });
+    }
+
+    private SessionElementDataWithLabelDto mapToDataWithLabelDto(SessionElementData sessionElementData) {
+        String elementId = sessionElementData.getSessionStep() != null
+                ? sessionElementData.getSessionStep().getElementId()
+                : null;
+        String label = elementId != null ? formFeignClient.fetchLabelByElementId(elementId) : null;
+        return new SessionElementDataWithLabelDto(elementId, label, sessionElementData.getData());
     }
 }

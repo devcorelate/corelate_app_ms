@@ -41,10 +41,10 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
 
     @Override
     @Transactional(readOnly = true)
-    public List<SessionElementDataWithLabelDto> fetchAllDataWithLabel() {
+    public List<Map<String, SessionElementDataWithLabelDto>> fetchAllDataWithLabel() {
         return sessionElementDataRepository.findAll()
                 .stream()
-                .map(this::mapToDataWithLabelDto)
+                .map(this::mapToWorkflowDataWithLabelDto)
                 .toList();
     }
 
@@ -86,10 +86,14 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
 
     private SessionElementDataWithLabelDto mapToDataWithLabelDto(SessionElementData sessionElementData) {
         JsonNode data = sessionElementData.getData();
-        String elementId = extractElementId(data);
-        JsonNode value = extractValue(data);
+        String elementId = extractElementId(data, sessionElementData);
+        JsonNode value = extractValue(data, elementId);
         String label = resolveLabel(elementId);
         return new SessionElementDataWithLabelDto(elementId, label, value);
+    }
+
+    private Map<String, SessionElementDataWithLabelDto> mapToWorkflowDataWithLabelDto(SessionElementData sessionElementData) {
+        return Map.of(sessionElementData.getWorkflowId(), mapToDataWithLabelDto(sessionElementData));
     }
 
     private String resolveLabel(String elementId) {
@@ -105,17 +109,37 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         }
     }
 
-    private String extractElementId(JsonNode data) {
-        if (data == null || !data.hasNonNull("elementId")) {
-            return null;
+    private String extractElementId(JsonNode data, SessionElementData sessionElementData) {
+        if (data != null && data.hasNonNull("elementId")) {
+            return data.get("elementId").asText();
         }
-        return data.get("elementId").asText();
+
+        if (data != null && data.isObject()) {
+            if (data.fieldNames().hasNext()) {
+                return data.fieldNames().next();
+            }
+        }
+
+        if (sessionElementData.getSessionStep() != null) {
+            return sessionElementData.getSessionStep().getElementId();
+        }
+
+        return null;
     }
 
-    private JsonNode extractValue(JsonNode data) {
-        if (data == null || !data.has("value")) {
+    private JsonNode extractValue(JsonNode data, String elementId) {
+        if (data == null) {
             return null;
         }
-        return data.get("value");
+
+        if (data.has("value")) {
+            return data.get("value");
+        }
+
+        if (elementId != null && data.has(elementId)) {
+            return data.get(elementId);
+        }
+
+        return null;
     }
 }

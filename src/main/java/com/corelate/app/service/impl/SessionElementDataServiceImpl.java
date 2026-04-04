@@ -16,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -48,12 +51,17 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     @Override
     @Transactional(readOnly = true)
     public Map<String, List<SessionElementDataWithLabelDto>> fetchAllDataWithLabel() {
+        Map<String, String> labelCache = new HashMap<>();
         return sessionElementDataRepository.findAll()
                 .stream()
+                .filter(this::hasDataObject)
                 .collect(Collectors.groupingBy(
                         SessionElementData::getWorkflowId,
                         LinkedHashMap::new,
-                        Collectors.mapping(this::mapToDataWithLabelDto, Collectors.toList())
+                        Collectors.flatMapping(
+                                sessionElementData -> mapToDataWithLabelDtos(sessionElementData, labelCache).stream(),
+                                Collectors.toList()
+                        )
                 ));
     }
 
@@ -93,12 +101,26 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         });
     }
 
-    private SessionElementDataWithLabelDto mapToDataWithLabelDto(SessionElementData sessionElementData) {
+    private List<SessionElementDataWithLabelDto> mapToDataWithLabelDtos(SessionElementData sessionElementData,
+                                                                        Map<String, String> labelCache) {
         JsonNode data = sessionElementData.getData();
-        String elementId = extractElementId(data, sessionElementData);
-        JsonNode value = extractValue(data, elementId);
-        String label = resolveLabel(elementId);
-        return new SessionElementDataWithLabelDto(elementId, label, value);
+        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
+        Iterator<Map.Entry<String, JsonNode>> fields = data.fields();
+
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> field = fields.next();
+            String elementId = field.getKey();
+            JsonNode value = field.getValue();
+            String label = labelCache.computeIfAbsent(elementId, this::resolveLabel);
+            sessionElementDataWithLabelDtos.add(new SessionElementDataWithLabelDto(elementId, label, value));
+        }
+
+        return sessionElementDataWithLabelDtos;
+    }
+
+    private boolean hasDataObject(SessionElementData sessionElementData) {
+        JsonNode data = sessionElementData.getData();
+        return data != null && data.isObject();
     }
 
     private String resolveLabel(String elementId) {
@@ -135,37 +157,4 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         return rawLabelResponse;
     }
 
-    private String extractElementId(JsonNode data, SessionElementData sessionElementData) {
-        if (data != null && data.hasNonNull("elementId")) {
-            return data.get("elementId").asText();
-        }
-
-        if (data != null && data.isObject()) {
-            if (data.fieldNames().hasNext()) {
-                return data.fieldNames().next();
-            }
-        }
-
-        if (sessionElementData.getSessionStep() != null) {
-            return sessionElementData.getSessionStep().getElementId();
-        }
-
-        return null;
-    }
-
-    private JsonNode extractValue(JsonNode data, String elementId) {
-        if (data == null) {
-            return null;
-        }
-
-        if (data.has("value")) {
-            return data.get("value");
-        }
-
-        if (elementId != null && data.has(elementId)) {
-            return data.get(elementId);
-        }
-
-        return null;
-    }
 }

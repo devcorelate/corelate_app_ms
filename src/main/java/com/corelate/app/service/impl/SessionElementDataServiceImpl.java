@@ -8,6 +8,8 @@ import com.corelate.app.service.ISessionElementDataService;
 import com.corelate.app.service.client.FormFeignClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,8 @@ import java.util.Map;
 
 @Service
 public class SessionElementDataServiceImpl implements ISessionElementDataService {
+
+    private static final Logger logger = LoggerFactory.getLogger(SessionElementDataServiceImpl.class);
 
     private final SessionElementDataRepository sessionElementDataRepository;
     private final FormFeignClient formFeignClient;
@@ -81,10 +85,37 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     }
 
     private SessionElementDataWithLabelDto mapToDataWithLabelDto(SessionElementData sessionElementData) {
-        String elementId = sessionElementData.getSessionStep() != null
-                ? sessionElementData.getSessionStep().getElementId()
-                : null;
-        String label = elementId != null ? formFeignClient.fetchLabelByElementId(elementId) : null;
-        return new SessionElementDataWithLabelDto(elementId, label, sessionElementData.getData());
+        JsonNode data = sessionElementData.getData();
+        String elementId = extractElementId(data);
+        JsonNode value = extractValue(data);
+        String label = resolveLabel(elementId);
+        return new SessionElementDataWithLabelDto(elementId, label, value);
+    }
+
+    private String resolveLabel(String elementId) {
+        if (elementId == null) {
+            return null;
+        }
+
+        try {
+            return formFeignClient.fetchLabelByElementId(elementId);
+        } catch (Exception exception) {
+            logger.warn("Unable to fetch label from forms service for elementId={}", elementId, exception);
+            return null;
+        }
+    }
+
+    private String extractElementId(JsonNode data) {
+        if (data == null || !data.hasNonNull("elementId")) {
+            return null;
+        }
+        return data.get("elementId").asText();
+    }
+
+    private JsonNode extractValue(JsonNode data) {
+        if (data == null || !data.has("value")) {
+            return null;
+        }
+        return data.get("value");
     }
 }

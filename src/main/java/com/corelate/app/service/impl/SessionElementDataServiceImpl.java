@@ -81,10 +81,24 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     }
 
     private SessionElementDataWithLabelDto mapToDataWithLabelDto(SessionElementData sessionElementData) {
-        String elementId = sessionElementData.getSessionStep() != null
-                ? sessionElementData.getSessionStep().getElementId()
-                : null;
+        JsonNode data = sessionElementData.getData();
+        String elementId = extractElementId(data);
+        JsonNode value = extractValue(data);
         String label = elementId != null ? formFeignClient.fetchLabelByElementId(elementId) : null;
-        return new SessionElementDataWithLabelDto(elementId, label, sessionElementData.getData());
+        return new SessionElementDataWithLabelDto(elementId, label, value);
+    }
+
+    private String extractElementId(JsonNode data) {
+        if (data == null || !data.hasNonNull("elementId")) {
+            return null;
+        }
+        return data.get("elementId").asText();
+    }
+
+    private JsonNode extractValue(JsonNode data) {
+        if (data == null || !data.has("value")) {
+            return null;
+        }
+        return data.get("value");
     }
 }

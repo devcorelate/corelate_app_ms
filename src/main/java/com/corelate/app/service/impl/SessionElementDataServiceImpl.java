@@ -1,11 +1,15 @@
 package com.corelate.app.service.impl;
 
+import com.corelate.app.dto.SessionElementDataWithLabelDto;
 import com.corelate.app.entity.SessionElementData;
 import com.corelate.app.exeption.ResourceNotFoundException;
 import com.corelate.app.repository.SessionElementDataRepository;
 import com.corelate.app.service.ISessionElementDataService;
+import com.corelate.app.service.client.FormFeignClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +19,15 @@ import java.util.Map;
 @Service
 public class SessionElementDataServiceImpl implements ISessionElementDataService {
 
-    private final SessionElementDataRepository sessionElementDataRepository;
+    private static final Logger logger = LoggerFactory.getLogger(SessionElementDataServiceImpl.class);
 
-    public SessionElementDataServiceImpl(SessionElementDataRepository sessionElementDataRepository) {
+    private final SessionElementDataRepository sessionElementDataRepository;
+    private final FormFeignClient formFeignClient;
+
+    public SessionElementDataServiceImpl(SessionElementDataRepository sessionElementDataRepository,
+                                         FormFeignClient formFeignClient) {
         this.sessionElementDataRepository = sessionElementDataRepository;
+        this.formFeignClient = formFeignClient;
     }
 
     @Override
@@ -27,6 +36,15 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         return sessionElementDataRepository.findAll()
                 .stream()
                 .map(SessionElementData::getData)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, SessionElementDataWithLabelDto>> fetchAllDataWithLabel() {
+        return sessionElementDataRepository.findAll()
+                .stream()
+                .map(this::mapToWorkflowDataWithLabelDto)
                 .toList();
     }
 
@@ -64,5 +82,64 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
                 objectNode.set(id, value);
             }
         });
+    }
+
+    private SessionElementDataWithLabelDto mapToDataWithLabelDto(SessionElementData sessionElementData) {
+        JsonNode data = sessionElementData.getData();
+        String elementId = extractElementId(data, sessionElementData);
+        JsonNode value = extractValue(data, elementId);
+        String label = resolveLabel(elementId);
+        return new SessionElementDataWithLabelDto(elementId, label, value);
+    }
+
+    private Map<String, SessionElementDataWithLabelDto> mapToWorkflowDataWithLabelDto(SessionElementData sessionElementData) {
+        return Map.of(sessionElementData.getWorkflowId(), mapToDataWithLabelDto(sessionElementData));
+    }
+
+    private String resolveLabel(String elementId) {
+        if (elementId == null) {
+            return null;
+        }
+
+        try {
+            return formFeignClient.fetchLabelByElementId(elementId);
+        } catch (Exception exception) {
+            logger.warn("Unable to fetch label from forms service for elementId={}", elementId, exception);
+            return null;
+        }
+    }
+
+    private String extractElementId(JsonNode data, SessionElementData sessionElementData) {
+        if (data != null && data.hasNonNull("elementId")) {
+            return data.get("elementId").asText();
+        }
+
+        if (data != null && data.isObject()) {
+            if (data.fieldNames().hasNext()) {
+                return data.fieldNames().next();
+            }
+        }
+
+        if (sessionElementData.getSessionStep() != null) {
+            return sessionElementData.getSessionStep().getElementId();
+        }
+
+        return null;
+    }
+
+    private JsonNode extractValue(JsonNode data, String elementId) {
+        if (data == null) {
+            return null;
+        }
+
+        if (data.has("value")) {
+            return data.get("value");
+        }
+
+        if (elementId != null && data.has(elementId)) {
+            return data.get(elementId);
+        }
+
+        return null;
     }
 }

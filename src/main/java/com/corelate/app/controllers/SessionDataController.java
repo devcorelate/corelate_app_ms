@@ -3,6 +3,7 @@ package com.corelate.app.controllers;
 import com.corelate.app.constants.AppConstants;
 import com.corelate.app.dto.ResponseDto;
 import com.corelate.app.dto.SessionDataDto;
+import com.corelate.app.exeption.SessionIdMismatchException;
 import com.corelate.app.service.ISessionDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -61,6 +62,9 @@ public class SessionDataController {
     public ResponseEntity<ResponseDto> updateSessionData(@PathVariable String sessionId,
                                                          @Valid @RequestBody SessionDataDto sessionDataDto) {
         logger.debug("updateSessionData method start");
+        if (sessionDataDto.getSessionId() != null && !sessionId.equals(sessionDataDto.getSessionId())) {
+            throw new SessionIdMismatchException(sessionId, sessionDataDto.getSessionId());
+        }
         sessionDataService.updateSessionData(sessionId, sessionDataDto);
         logger.debug("updateSessionData method end");
         return ResponseEntity.status(HttpStatus.OK)
@@ -77,6 +81,20 @@ public class SessionDataController {
         logger.debug("deleteSessionData method start");
         sessionDataService.deleteSessionData(sessionId);
         logger.debug("deleteSessionData method end");
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(new ResponseDto(AppConstants.STATUS_200, AppConstants.MESSAGE_200));
+    }
+
+    @Operation(summary = "Delete all Session Data REST API", description = "REST API to delete all SessionData")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "HTTP Status OK"),
+            @ApiResponse(responseCode = "500", description = "HTTP Status Internal Server Error", content = @Content(schema = @Schema(implementation = com.corelate.app.dto.ErrorResponseDto.class)))
+    })
+    @DeleteMapping("/delete/all")
+    public ResponseEntity<ResponseDto> deleteAllSessionData() {
+        logger.debug("deleteAllSessionData method start");
+        sessionDataService.deleteAllSessionData();
+        logger.debug("deleteAllSessionData method end");
         return ResponseEntity.status(HttpStatus.OK)
                 .body(new ResponseDto(AppConstants.STATUS_200, AppConstants.MESSAGE_200));
     }

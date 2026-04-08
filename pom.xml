@@ -96,14 +96,14 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>javax.xml.bind</groupId>
 			<artifactId>jaxb-api</artifactId>
 			<version>2.3.1</version>
-		</dependency>
-		<dependency>
-			<groupId>com.google.code.findbugs</groupId>
-			<artifactId>jsr305</artifactId>
-			<version>3.0.2</version>
 		</dependency>
 
 		<!--		<dependency>-->
@@ -155,23 +155,14 @@
 				<version>${jib-maven-plugin.version}</version>
 				<configuration>
 					<from>
-						<!-- Distroless: Minimal attack surface, no shell, production-ready -->
-						<image>gcr.io/distroless/java21-debian12</image>
+						<image>eclipse-temurin:21-jre</image>
 					</from>
 					<to>
-						<image>689635266888.dkr.ecr.ap-southeast-1.amazonaws.com/bpmn/corelate_list_ms</image>
-						<tags>
-							<tag>latest</tag>
-							<tag>${project.version}</tag>
-						</tags>
+						<image>devcorelate01/${project.artifactId}:v1.5.29</image>
 					</to>
-					<container>
-						<mainClass>com.corelate.app.AppManagementApplication</mainClass>
-					</container>
 				</configuration>
 			</plugin>
 		</plugins>
 	</build>
 
 </project>
-

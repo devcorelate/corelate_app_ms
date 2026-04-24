@@ -67,6 +67,27 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
 
     @Override
     @Transactional(readOnly = true)
+    public Map<String, List<SessionElementDataWithLabelDto>> fetchAllDataWithLabelByWorkflowId(String workflowId) {
+        List<SessionElementData> dataList = sessionElementDataRepository.findByWorkflowId(workflowId);
+        if (dataList.isEmpty()) {
+            throw new ResourceNotFoundException("SessionElementData", "workflowId", workflowId);
+        }
+
+        Map<String, String> labelCache = new HashMap<>();
+        return dataList.stream()
+                .filter(this::hasDataObject)
+                .collect(Collectors.groupingBy(
+                        SessionElementData::getWorkflowId,
+                        LinkedHashMap::new,
+                        Collectors.flatMapping(
+                                sessionElementData -> mapToDataWithLabelDtos(sessionElementData, labelCache).stream(),
+                                Collectors.toList()
+                        )
+                ));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<JsonNode> fetchAllDataByWorkflowId(String workflowId) {
         List<SessionElementData> dataList = sessionElementDataRepository.findByWorkflowId(workflowId);
         if (dataList.isEmpty()) {

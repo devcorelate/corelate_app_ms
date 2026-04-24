@@ -67,6 +67,21 @@ public class SessionElementDataController {
         return ResponseEntity.status(HttpStatus.OK).body(data);
     }
 
+    @Operation(summary = "Fetch SessionElementData payloads with labels by workflowId",
+            description = "REST API to fetch all data payloads by workflowId including id, label, and value")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "HTTP Status OK"),
+            @ApiResponse(responseCode = "500", description = "HTTP Status Internal Server Error", content = @Content(schema = @Schema(implementation = com.corelate.app.dto.ErrorResponseDto.class)))
+    })
+    @GetMapping("/fetch/data/{workflowId}/with-label")
+    public ResponseEntity<Map<String, List<SessionElementDataWithLabelDto>>> fetchAllDataWithLabelByWorkflowId(
+            @PathVariable @NotBlank String workflowId) {
+        logger.debug("fetchAllDataWithLabelByWorkflowId method start");
+        Map<String, List<SessionElementDataWithLabelDto>> data = sessionElementDataService.fetchAllDataWithLabelByWorkflowId(workflowId);
+        logger.debug("fetchAllDataWithLabelByWorkflowId method end");
+        return ResponseEntity.status(HttpStatus.OK).body(data);
+    }
+
     @Operation(summary = "Fetch SessionElementData payloads by workflowId", description = "REST API to fetch all data payloads by workflowId")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "HTTP Status OK"),

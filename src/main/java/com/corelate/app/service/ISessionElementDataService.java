@@ -12,6 +12,8 @@ public interface ISessionElementDataService {
 
     Map<String, List<SessionElementDataWithLabelDto>> fetchAllDataWithLabel();
 
+    Map<String, List<SessionElementDataWithLabelDto>> fetchAllDataWithLabelByWorkflowId(String workflowId);
+
     List<JsonNode> fetchAllDataByWorkflowId(String workflowId);
 
     List<JsonNode> updateDataByWorkflowId(String workflowId, Map<String, JsonNode> updates);

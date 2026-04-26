@@ -198,6 +198,8 @@ public class SessionDataServiceImpl implements ISessionDataService {
 
     private SessionDataDto mapToDto(SessionData sessionData) {
         SessionDataDto dto = new SessionDataDto();
+        dto.setCreatedBy(sessionData.getCreatedBy());
+        dto.setCreatedByEmail(sessionData.getCreatedByEmail());
         dto.setSessionId(sessionData.getSessionId());
         dto.setWorkflowId(sessionData.getWorkflowId());
         dto.setStartedAt(sessionData.getStartedAt());

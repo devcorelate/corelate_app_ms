@@ -17,6 +17,10 @@ public class MockAppDto extends BaseDto {
 
     private String applicationType;
 
+    private String certificatePdfPath;
+
+    private String createdByEmail;
+
     private String formId;
 
     private String pageMessage;

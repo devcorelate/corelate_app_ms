@@ -289,6 +289,7 @@ public class AppServiceImpl implements IAppService {
         mockApp.setAppId(mockAppDto.getAppId());
         mockApp.setName(mockAppDto.getName());
         mockApp.setDescription(mockAppDto.getDescription());
+        mockApp.setCertificatePdfPath(mockAppDto.getCertificatePdfPath());
         mockApp.setRole(mockAppDto.getRole());
         mockApp.setAudience(mockAppDto.getAudience());
         mockApp.setApplicationType(mockAppDto.getApplicationType());
@@ -301,6 +302,7 @@ public class AppServiceImpl implements IAppService {
         MockAppDto mockAppDto = new MockAppDto();
         mockAppDto.setAppId(mockApp.getAppId());
         mockAppDto.setName(mockApp.getName());
+        mockAppDto.setCertificatePdfPath(mockApp.getCertificatePdfPath());
         mockAppDto.setDescription(mockApp.getDescription());
         mockAppDto.setRole(mockApp.getRole());
         mockAppDto.setAudience(mockApp.getAudience());

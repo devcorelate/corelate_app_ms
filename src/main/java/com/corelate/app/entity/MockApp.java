@@ -26,6 +26,10 @@ public class MockApp extends BaseEntity {
 
     private String audience;
 
+    private String certificatePdfPath;
+
+    private String createdByEmail;
+
     private String applicationType;
 
     private String formId;

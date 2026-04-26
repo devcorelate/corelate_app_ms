@@ -115,11 +115,15 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
             return;
         }
 
-        updates.forEach((id, value) -> {
-            if (objectNode.has(id)) {
-                objectNode.set(id, value);
-            }
-        });
+        updates.forEach((key, value) -> objectNode.set(key, normalizeEmailValueIfNeeded(key, value)));
+    }
+
+    private JsonNode normalizeEmailValueIfNeeded(String key, JsonNode value) {
+        if (key == null || value == null || !value.isTextual() || !key.toLowerCase().contains("email")) {
+            return value;
+        }
+
+        return objectMapper.getNodeFactory().textNode(value.asText().trim());
     }
 
     private List<SessionElementDataWithLabelDto> mapToDataWithLabelDtos(SessionElementData sessionElementData,

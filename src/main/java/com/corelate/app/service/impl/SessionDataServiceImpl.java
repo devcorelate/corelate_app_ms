@@ -110,6 +110,7 @@ public class SessionDataServiceImpl implements ISessionDataService {
         SessionData newSessionData = mapToEntity(sessionDataDto, new SessionData());
         newSessionData.setCreatedAt(LocalDateTime.now());
         newSessionData.setCreatedBy(sessionDataDto.getCreatedBy());
+        newSessionData.setCreatedByEmail(sessionDataDto.getCreatedByEmail());
         sessionDataRepository.save(newSessionData);
     }
 

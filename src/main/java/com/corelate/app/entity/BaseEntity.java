@@ -14,10 +14,10 @@ public class BaseEntity {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(insertable = false)
+    @Column(updatable = false)
     private String createdBy;
 
-    @Column(insertable = false)
+    @Column(updatable = false)
     private String createdByEmail;
 
     @Column(insertable = false)

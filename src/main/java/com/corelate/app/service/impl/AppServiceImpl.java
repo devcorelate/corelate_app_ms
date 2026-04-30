@@ -283,6 +283,14 @@ public class AppServiceImpl implements IAppService {
                 .toList();
     }
 
+    @Override
+    public List<FormBindingDto> fetchFormBindingsByAppIds(List<String> appIds) {
+        return mockAppRepository.findByAppIdIn(appIds).stream()
+                .filter(mockApp -> mockApp.getFormId() != null && !mockApp.getFormId().isBlank())
+                .map(mockApp -> new FormBindingDto(mockApp.getAppId(), mockApp.getFormId()))
+                .toList();
+    }
+
     private void mapMockApp(MockAppDto mockAppDto, MockApp mockApp) {
         mockApp.setCreatedByEmail(mockAppDto.getCreatedByEmail());
         mockApp.setCreatedBy(mockAppDto.getCreatedBy());

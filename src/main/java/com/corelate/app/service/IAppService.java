@@ -80,4 +80,6 @@ public interface IAppService {
 
 	List<MockAppDto> fetchAllMockApps();
 
+	List<FormBindingDto> fetchFormBindingsByAppIds(List<String> appIds);
+
 }

@@ -43,5 +43,5 @@ public class MockApp extends BaseEntity {
     private String workflowId;
 
     @OneToMany(mappedBy = "mockApp", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<MockAppPdfFieldMapping> pdfFieldMappings = new ArrayList<>();
+    private List<MockAppCertificateFieldMapping> certificateFieldMappings = new ArrayList<>();
 }

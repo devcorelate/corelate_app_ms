@@ -29,5 +29,5 @@ public class MockAppDto extends BaseDto {
 
     private String workflowId;
 
-    private List<MockAppPdfFieldMappingDto> pdfFieldMappings;
+    private List<MockAppCertificateFieldMappingDto> certificateFieldMappings;
 }

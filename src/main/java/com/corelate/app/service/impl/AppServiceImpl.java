@@ -6,7 +6,7 @@ import com.corelate.app.entity.FormData;
 import com.corelate.app.entity.FormDataEntity;
 import com.corelate.app.entity.ListData;
 import com.corelate.app.entity.MockApp;
-import com.corelate.app.entity.MockAppPdfFieldMapping;
+import com.corelate.app.entity.MockAppCertificateFieldMapping;
 import com.corelate.app.entity.PublishLog;
 import com.corelate.app.exeption.ResourceNotFoundException;
 import com.corelate.app.mapper.AppMapper;
@@ -271,7 +271,7 @@ public class AppServiceImpl implements IAppService {
 
     @Override
     public MockAppDto fetchMockApp(String appId) {
-        MockApp mockApp = mockAppRepository.findWithPdfFieldMappingsByAppId(appId)
+        MockApp mockApp = mockAppRepository.findWithCertificateFieldMappingsByAppId(appId)
                 .orElseThrow(() -> new ResourceNotFoundException("MockApp", "appId", appId));
         return mapMockAppDto(mockApp);
     }
@@ -305,15 +305,15 @@ public class AppServiceImpl implements IAppService {
         mockApp.setFormId(mockAppDto.getFormId());
         mockApp.setPageMessage(mockAppDto.getPageMessage());
         mockApp.setWorkflowId(mockAppDto.getWorkflowId());
-        mockApp.getPdfFieldMappings().clear();
-        if (mockAppDto.getPdfFieldMappings() != null) {
-            for (MockAppPdfFieldMappingDto mappingDto : mockAppDto.getPdfFieldMappings()) {
-                MockAppPdfFieldMapping mapping = new MockAppPdfFieldMapping();
+        mockApp.getCertificateFieldMappings().clear();
+        if (mockAppDto.getCertificateFieldMappings() != null) {
+            for (MockAppCertificateFieldMappingDto mappingDto : mockAppDto.getCertificateFieldMappings()) {
+                MockAppCertificateFieldMapping mapping = new MockAppCertificateFieldMapping();
                 mapping.setPdfField(mappingDto.getPdfField());
                 mapping.setSourcePath(mappingDto.getSourcePath());
                 mapping.setFallbackValue(mappingDto.getFallbackValue());
                 mapping.setMockApp(mockApp);
-                mockApp.getPdfFieldMappings().add(mapping);
+                mockApp.getCertificateFieldMappings().add(mapping);
             }
         }
     }
@@ -332,11 +332,11 @@ public class AppServiceImpl implements IAppService {
         mockAppDto.setWorkflowId(mockApp.getWorkflowId());
         mockAppDto.setCreatedBy(mockApp.getCreatedBy());
         mockAppDto.setCreatedByEmail(mockApp.getCreatedByEmail());
-        if (mockApp.getPdfFieldMappings() != null) {
-            mockAppDto.setPdfFieldMappings(mockApp.getPdfFieldMappings()
+        if (mockApp.getCertificateFieldMappings() != null) {
+            mockAppDto.setCertificateFieldMappings(mockApp.getCertificateFieldMappings()
                     .stream()
                     .map(mapping -> {
-                        MockAppPdfFieldMappingDto mappingDto = new MockAppPdfFieldMappingDto();
+                        MockAppCertificateFieldMappingDto mappingDto = new MockAppCertificateFieldMappingDto();
                         mappingDto.setPdfField(mapping.getPdfField());
                         mappingDto.setSourcePath(mapping.getSourcePath());
                         mappingDto.setFallbackValue(mapping.getFallbackValue());

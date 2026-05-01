@@ -271,7 +271,7 @@ public class AppServiceImpl implements IAppService {
 
     @Override
     public MockAppDto fetchMockApp(String appId) {
-        MockApp mockApp = mockAppRepository.findByAppId(appId)
+        MockApp mockApp = mockAppRepository.findWithPdfFieldMappingsByAppId(appId)
                 .orElseThrow(() -> new ResourceNotFoundException("MockApp", "appId", appId));
         return mapMockAppDto(mockApp);
     }

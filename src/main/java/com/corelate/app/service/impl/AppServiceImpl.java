@@ -6,6 +6,7 @@ import com.corelate.app.entity.FormData;
 import com.corelate.app.entity.FormDataEntity;
 import com.corelate.app.entity.ListData;
 import com.corelate.app.entity.MockApp;
+import com.corelate.app.entity.MockAppPdfFieldMapping;
 import com.corelate.app.entity.PublishLog;
 import com.corelate.app.exeption.ResourceNotFoundException;
 import com.corelate.app.mapper.AppMapper;
@@ -304,6 +305,17 @@ public class AppServiceImpl implements IAppService {
         mockApp.setFormId(mockAppDto.getFormId());
         mockApp.setPageMessage(mockAppDto.getPageMessage());
         mockApp.setWorkflowId(mockAppDto.getWorkflowId());
+        mockApp.getPdfFieldMappings().clear();
+        if (mockAppDto.getPdfFieldMappings() != null) {
+            for (MockAppPdfFieldMappingDto mappingDto : mockAppDto.getPdfFieldMappings()) {
+                MockAppPdfFieldMapping mapping = new MockAppPdfFieldMapping();
+                mapping.setPdfField(mappingDto.getPdfField());
+                mapping.setSourcePath(mappingDto.getSourcePath());
+                mapping.setFallbackValue(mappingDto.getFallbackValue());
+                mapping.setMockApp(mockApp);
+                mockApp.getPdfFieldMappings().add(mapping);
+            }
+        }
     }
 
     private MockAppDto mapMockAppDto(MockApp mockApp) {
@@ -320,6 +332,17 @@ public class AppServiceImpl implements IAppService {
         mockAppDto.setWorkflowId(mockApp.getWorkflowId());
         mockAppDto.setCreatedBy(mockApp.getCreatedBy());
         mockAppDto.setCreatedByEmail(mockApp.getCreatedByEmail());
+        if (mockApp.getPdfFieldMappings() != null) {
+            mockAppDto.setPdfFieldMappings(mockApp.getPdfFieldMappings()
+                    .stream()
+                    .map(mapping -> {
+                        MockAppPdfFieldMappingDto mappingDto = new MockAppPdfFieldMappingDto();
+                        mappingDto.setPdfField(mapping.getPdfField());
+                        mappingDto.setSourcePath(mapping.getSourcePath());
+                        mappingDto.setFallbackValue(mapping.getFallbackValue());
+                        return mappingDto;
+                    }).toList());
+        }
         return mockAppDto;
     }
 

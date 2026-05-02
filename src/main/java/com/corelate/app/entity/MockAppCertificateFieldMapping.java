@@ -1,29 +1,63 @@
 package com.corelate.app.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
 
 @Entity
 @Table(name = "mock_app_certificate_field_mapping")
-@Data
 public class MockAppCertificateFieldMapping {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String appId;
+    private String pdfField;
 
-    @Column(nullable = false)
-    private String workflowId;
-
-    @Column(nullable = false)
-    private String formId;
-
-    @Column(nullable = false)
     private String sourcePath;
 
-    @Column(nullable = false)
-    private String targetField;
+    @Column(columnDefinition = "TEXT")
+    private String fallbackValue;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mock_app_id", nullable = false)
+    private MockApp mockApp;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getPdfField() {
+        return pdfField;
+    }
+
+    public void setPdfField(String pdfField) {
+        this.pdfField = pdfField;
+    }
+
+    public String getSourcePath() {
+        return sourcePath;
+    }
+
+    public void setSourcePath(String sourcePath) {
+        this.sourcePath = sourcePath;
+    }
+
+    public String getFallbackValue() {
+        return fallbackValue;
+    }
+
+    public void setFallbackValue(String fallbackValue) {
+        this.fallbackValue = fallbackValue;
+    }
+
+    public MockApp getMockApp() {
+        return mockApp;
+    }
+
+    public void setMockApp(MockApp mockApp) {
+        this.mockApp = mockApp;
+    }
 }

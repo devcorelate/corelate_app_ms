@@ -7,5 +7,9 @@ import java.util.List;
 
 public interface MockAppCertificateFieldMappingRepository extends JpaRepository<MockAppCertificateFieldMapping, Long> {
 
-    List<MockAppCertificateFieldMapping> findByFormIdAndWorkflowId(String formId, String workflowId);
+    List<MockAppCertificateFieldMapping> findByMockApp_FormIdAndMockApp_WorkflowId(String formId, String workflowId);
+
+    default List<MockAppCertificateFieldMapping> findByFormIdAndWorkflowId(String formId, String workflowId) {
+        return findByMockApp_FormIdAndMockApp_WorkflowId(formId, workflowId);
+    }
 }

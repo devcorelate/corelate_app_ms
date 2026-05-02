@@ -4,16 +4,20 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
-@Table(name = "mock_app_certificate_field_mapping")
+@Table(name = "session_form_field_pairing", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_session_form_mapping", columnNames = {
+                "sessionId", "workflowId", "formId", "sourcePath", "targetField"
+        })
+})
 @Data
-public class MockAppCertificateFieldMapping {
+public class SessionFormFieldPairing {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private String appId;
+    private String sessionId;
 
     @Column(nullable = false)
     private String workflowId;
@@ -26,4 +30,7 @@ public class MockAppCertificateFieldMapping {
 
     @Column(nullable = false)
     private String targetField;
+
+    @Column(columnDefinition = "TEXT")
+    private String value;
 }

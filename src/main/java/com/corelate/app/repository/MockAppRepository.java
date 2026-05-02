@@ -11,12 +11,5 @@ public interface MockAppRepository extends JpaRepository<MockApp, Long> {
 
     Optional<MockApp> findByAppId(String appId);
 
-    @EntityGraph(attributePaths = "certificateFieldMappings")
-    Optional<MockApp> findWithCertificateFieldMappingsByAppId(String appId);
-
-    @Override
-    @EntityGraph(attributePaths = "certificateFieldMappings")
-    List<MockApp> findAll();
-
     List<MockApp> findByAppIdIn(List<String> appIds);
 }

@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "mock_app")
@@ -38,4 +41,7 @@ public class MockApp extends BaseEntity {
     private String pageMessage;
 
     private String workflowId;
+
+    @OneToMany(mappedBy = "mockApp", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<MockAppCertificateFieldMapping> certificateFieldMappings = new ArrayList<>();
 }

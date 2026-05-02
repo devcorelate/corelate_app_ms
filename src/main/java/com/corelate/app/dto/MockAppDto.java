@@ -2,6 +2,8 @@ package com.corelate.app.dto;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class MockAppDto extends BaseDto {
 
@@ -26,4 +28,6 @@ public class MockAppDto extends BaseDto {
     private String pageMessage;
 
     private String workflowId;
+
+    private List<MockAppCertificateFieldMappingDto> certificateFieldMappings;
 }

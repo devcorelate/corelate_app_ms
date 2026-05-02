@@ -14,6 +14,8 @@ import com.corelate.app.repository.SessionFormFieldPairingRepository;
 import com.corelate.app.service.ISessionFormPairingService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +36,7 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
     }
 
     @Override
+    @Transactional
     public SessionFormPairResultDto pairSessionFormData(SessionFormPairRequestDto requestDto) {
         SessionData sessionData = sessionDataRepository.findBySessionId(requestDto.getSessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", requestDto.getSessionId()));
@@ -42,15 +45,37 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
             throw new IllegalArgumentException("workflowId mismatch with session data");
         }
 
-        List<MockAppCertificateFieldMapping> mappings = mappingRepository.findByMockAppId(requestDto.getMockAppId());
+        List<MockAppCertificateFieldMapping> mappings;
+        if (StringUtils.hasText(requestDto.getMockAppId()) && StringUtils.hasText(requestDto.getFormId())) {
+            mappings = mappingRepository.findByMockApp_AppIdAndMockApp_WorkflowIdAndMockApp_FormId(
+                    requestDto.getMockAppId(),
+                    requestDto.getWorkflowId(),
+                    requestDto.getFormId()
+            );
+        } else {
+            mappings = mappingRepository.findByMockApp_WorkflowId(requestDto.getWorkflowId());
+        }
 
         int created = 0;
         int updated = 0;
         int skipped = 0;
 
         for (MockAppCertificateFieldMapping mapping : mappings) {
-            String value = resolveSourceValue(sessionData, mapping.getSourcePath());
+            String resolvedSourcePath = StringUtils.hasText(mapping.getSourcePath())
+                    ? mapping.getSourcePath()
+                    : mapping.getTargetField();
+
+            String value = resolveSourceValue(sessionData, resolvedSourcePath);
             if (value == null) {
+                skipped++;
+                continue;
+            }
+
+            String effectiveFormId = StringUtils.hasText(requestDto.getFormId())
+                    ? requestDto.getFormId()
+                    : mapping.getMockApp() != null ? mapping.getMockApp().getFormId() : null;
+
+            if (!StringUtils.hasText(effectiveFormId)) {
                 skipped++;
                 continue;
             }
@@ -59,8 +84,8 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                     .findBySessionIdAndWorkflowIdAndFormIdAndSourcePathAndTargetField(
                             requestDto.getSessionId(),
                             requestDto.getWorkflowId(),
-                            requestDto.getFormId(),
-                            mapping.getSourcePath(),
+                            effectiveFormId,
+                            resolvedSourcePath,
                             mapping.getTargetField()
                     );
 
@@ -77,8 +102,8 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                 SessionFormFieldPairing pairing = new SessionFormFieldPairing();
                 pairing.setSessionId(requestDto.getSessionId());
                 pairing.setWorkflowId(requestDto.getWorkflowId());
-                pairing.setFormId(requestDto.getFormId());
-                pairing.setSourcePath(mapping.getSourcePath());
+                pairing.setFormId(effectiveFormId);
+                pairing.setSourcePath(resolvedSourcePath);
                 pairing.setTargetField(mapping.getTargetField());
                 pairing.setValue(value);
                 pairingRepository.save(pairing);
@@ -112,16 +137,65 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
             return resolveByStepAndField(sessionData, stepId, fieldKey);
         }
 
+        String sourceLabel = extractSourceLabel(sourcePath);
+
         for (SessionStep step : sessionData.getSteps()) {
             if (step.getSessionElementData() == null || step.getSessionElementData().getData() == null) {
                 continue;
             }
-            JsonNode fieldNode = step.getSessionElementData().getData().get(sourcePath);
+
+            JsonNode stepData = step.getSessionElementData().getData();
+
+            JsonNode fieldNode = stepData.get(sourcePath);
             if (fieldNode != null && !fieldNode.isNull()) {
                 return fieldNode.isTextual() ? fieldNode.asText() : fieldNode.toString();
             }
+
+            if (sourceLabel != null) {
+                JsonNode mappedData = stepData.get("mappedData");
+                if (mappedData != null && mappedData.isObject()) {
+                    JsonNode mappedValue = mappedData.get(sourceLabel);
+                    if (mappedValue != null && !mappedValue.isNull()) {
+                        return mappedValue.isTextual() ? mappedValue.asText() : mappedValue.toString();
+                    }
+                }
+
+                var fieldNames = stepData.fieldNames();
+                while (fieldNames.hasNext()) {
+                    String key = fieldNames.next();
+                    String keyLabel = extractLabelFromKey(key);
+                    if (key.endsWith("-" + sourceLabel)
+                            || (keyLabel != null && keyLabel.equalsIgnoreCase(sourceLabel))) {
+                        JsonNode matchedNode = stepData.get(key);
+                        if (matchedNode != null && !matchedNode.isNull()) {
+                            return matchedNode.isTextual() ? matchedNode.asText() : matchedNode.toString();
+                        }
+                    }
+                }
+            }
         }
         return null;
+    }
+
+    private String extractSourceLabel(String sourcePath) {
+        if (!StringUtils.hasText(sourcePath)) {
+            return null;
+        }
+
+        int dashIndex = sourcePath.lastIndexOf('-');
+        if (dashIndex < 0 || dashIndex == sourcePath.length() - 1) {
+            return null;
+        }
+
+        return sourcePath.substring(dashIndex + 1);
+    }
+
+    private String extractLabelFromKey(String key) {
+        if (!StringUtils.hasText(key)) {
+            return null;
+        }
+        int dashIndex = key.lastIndexOf('-');
+        return (dashIndex >= 0 && dashIndex < key.length() - 1) ? key.substring(dashIndex + 1) : key;
     }
 
     private String resolveByStepAndField(SessionData sessionData, String stepId, String fieldKey) {

@@ -15,6 +15,7 @@ import com.corelate.app.service.ISessionFormPairingService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +36,7 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
     }
 
     @Override
+    @Transactional
     public SessionFormPairResultDto pairSessionFormData(SessionFormPairRequestDto requestDto) {
         SessionData sessionData = sessionDataRepository.findBySessionId(requestDto.getSessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("SessionData", "sessionId", requestDto.getSessionId()));
@@ -65,7 +67,14 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                 continue;
             }
 
-            String effectiveFormId = requestDto.getFormId();
+            String effectiveFormId = StringUtils.hasText(requestDto.getFormId())
+                    ? requestDto.getFormId()
+                    : mapping.getMockApp() != null ? mapping.getMockApp().getFormId() : null;
+
+            if (!StringUtils.hasText(effectiveFormId)) {
+                skipped++;
+                continue;
+            }
 
             Optional<SessionFormFieldPairing> existing = pairingRepository
                     .findBySessionIdAndWorkflowIdAndFormIdAndSourcePathAndTargetField(

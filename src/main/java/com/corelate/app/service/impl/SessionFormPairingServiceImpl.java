@@ -42,8 +42,7 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
             throw new IllegalArgumentException("workflowId mismatch with session data");
         }
 
-        List<MockAppCertificateFieldMapping> mappings = mappingRepository.findByFormIdAndWorkflowId(
-                requestDto.getFormId(), requestDto.getWorkflowId());
+        List<MockAppCertificateFieldMapping> mappings = mappingRepository.findByMockAppId(requestDto.getMockAppId());
 
         int created = 0;
         int updated = 0;

@@ -61,7 +61,11 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
         int skipped = 0;
 
         for (MockAppCertificateFieldMapping mapping : mappings) {
-            String value = resolveSourceValue(sessionData, mapping.getSourcePath());
+            String resolvedSourcePath = StringUtils.hasText(mapping.getSourcePath())
+                    ? mapping.getSourcePath()
+                    : mapping.getTargetField();
+
+            String value = resolveSourceValue(sessionData, resolvedSourcePath);
             if (value == null) {
                 skipped++;
                 continue;
@@ -81,7 +85,7 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                             requestDto.getSessionId(),
                             requestDto.getWorkflowId(),
                             effectiveFormId,
-                            mapping.getSourcePath(),
+                            resolvedSourcePath,
                             mapping.getTargetField()
                     );
 
@@ -99,7 +103,7 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                 pairing.setSessionId(requestDto.getSessionId());
                 pairing.setWorkflowId(requestDto.getWorkflowId());
                 pairing.setFormId(effectiveFormId);
-                pairing.setSourcePath(mapping.getSourcePath());
+                pairing.setSourcePath(resolvedSourcePath);
                 pairing.setTargetField(mapping.getTargetField());
                 pairing.setValue(value);
                 pairingRepository.save(pairing);
@@ -159,7 +163,9 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                 var fieldNames = stepData.fieldNames();
                 while (fieldNames.hasNext()) {
                     String key = fieldNames.next();
-                    if (key.endsWith("-" + sourceLabel)) {
+                    String keyLabel = extractLabelFromKey(key);
+                    if (key.endsWith("-" + sourceLabel)
+                            || (keyLabel != null && keyLabel.equalsIgnoreCase(sourceLabel))) {
                         JsonNode matchedNode = stepData.get(key);
                         if (matchedNode != null && !matchedNode.isNull()) {
                             return matchedNode.isTextual() ? matchedNode.asText() : matchedNode.toString();
@@ -182,6 +188,14 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
         }
 
         return sourcePath.substring(dashIndex + 1);
+    }
+
+    private String extractLabelFromKey(String key) {
+        if (!StringUtils.hasText(key)) {
+            return null;
+        }
+        int dashIndex = key.lastIndexOf('-');
+        return (dashIndex >= 0 && dashIndex < key.length() - 1) ? key.substring(dashIndex + 1) : key;
     }
 
     private String resolveByStepAndField(SessionData sessionData, String stepId, String fieldKey) {

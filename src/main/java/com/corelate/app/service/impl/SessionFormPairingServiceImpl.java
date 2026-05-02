@@ -14,6 +14,7 @@ import com.corelate.app.repository.SessionFormFieldPairingRepository;
 import com.corelate.app.service.ISessionFormPairingService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,12 +43,16 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
             throw new IllegalArgumentException("workflowId mismatch with session data");
         }
 
-        List<MockAppCertificateFieldMapping> mappings = mappingRepository
-                .findByMockApp_AppIdAndMockApp_WorkflowIdAndMockApp_FormId(
-                        requestDto.getMockAppId(),
-                        requestDto.getWorkflowId(),
-                        requestDto.getFormId()
-                );
+        List<MockAppCertificateFieldMapping> mappings;
+        if (StringUtils.hasText(requestDto.getMockAppId()) && StringUtils.hasText(requestDto.getFormId())) {
+            mappings = mappingRepository.findByMockApp_AppIdAndMockApp_WorkflowIdAndMockApp_FormId(
+                    requestDto.getMockAppId(),
+                    requestDto.getWorkflowId(),
+                    requestDto.getFormId()
+            );
+        } else {
+            mappings = mappingRepository.findByMockApp_WorkflowId(requestDto.getWorkflowId());
+        }
 
         int created = 0;
         int updated = 0;
@@ -60,11 +65,13 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                 continue;
             }
 
+            String effectiveFormId = requestDto.getFormId();
+
             Optional<SessionFormFieldPairing> existing = pairingRepository
                     .findBySessionIdAndWorkflowIdAndFormIdAndSourcePathAndTargetField(
                             requestDto.getSessionId(),
                             requestDto.getWorkflowId(),
-                            requestDto.getFormId(),
+                            effectiveFormId,
                             mapping.getSourcePath(),
                             mapping.getTargetField()
                     );
@@ -82,7 +89,7 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                 SessionFormFieldPairing pairing = new SessionFormFieldPairing();
                 pairing.setSessionId(requestDto.getSessionId());
                 pairing.setWorkflowId(requestDto.getWorkflowId());
-                pairing.setFormId(requestDto.getFormId());
+                pairing.setFormId(effectiveFormId);
                 pairing.setSourcePath(mapping.getSourcePath());
                 pairing.setTargetField(mapping.getTargetField());
                 pairing.setValue(value);

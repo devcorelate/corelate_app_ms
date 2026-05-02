@@ -9,8 +9,10 @@ public class SessionFormPairRequestDto {
     @NotBlank
     private String sessionId;
 
+    @NotBlank
     private String formId;
 
+    @NotBlank
     private String mockAppId;
 
     @NotBlank

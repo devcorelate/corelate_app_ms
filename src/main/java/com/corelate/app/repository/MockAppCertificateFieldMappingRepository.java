@@ -12,7 +12,11 @@ public interface MockAppCertificateFieldMappingRepository extends JpaRepository<
 
     List<MockAppCertificateFieldMapping> findBySourcePath(String sourcePath);
 
-    List<MockAppCertificateFieldMapping> findByFormIdAndWorkflowId(String formId, @NotBlank String workflowId);
+    List<MockAppCertificateFieldMapping> findByMockApp_FormIdAndMockApp_WorkflowId(String formId, @NotBlank String workflowId);
 
-    List<MockAppCertificateFieldMapping> findByMockAppId(@NotBlank String mockAppId);
+    List<MockAppCertificateFieldMapping> findByMockApp_AppIdAndMockApp_WorkflowIdAndMockApp_FormId(
+            @NotBlank String appId,
+            @NotBlank String workflowId,
+            @NotBlank String formId
+    );
 }

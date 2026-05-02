@@ -133,16 +133,55 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
             return resolveByStepAndField(sessionData, stepId, fieldKey);
         }
 
+        String sourceLabel = extractSourceLabel(sourcePath);
+
         for (SessionStep step : sessionData.getSteps()) {
             if (step.getSessionElementData() == null || step.getSessionElementData().getData() == null) {
                 continue;
             }
-            JsonNode fieldNode = step.getSessionElementData().getData().get(sourcePath);
+
+            JsonNode stepData = step.getSessionElementData().getData();
+
+            JsonNode fieldNode = stepData.get(sourcePath);
             if (fieldNode != null && !fieldNode.isNull()) {
                 return fieldNode.isTextual() ? fieldNode.asText() : fieldNode.toString();
             }
+
+            if (sourceLabel != null) {
+                JsonNode mappedData = stepData.get("mappedData");
+                if (mappedData != null && mappedData.isObject()) {
+                    JsonNode mappedValue = mappedData.get(sourceLabel);
+                    if (mappedValue != null && !mappedValue.isNull()) {
+                        return mappedValue.isTextual() ? mappedValue.asText() : mappedValue.toString();
+                    }
+                }
+
+                var fieldNames = stepData.fieldNames();
+                while (fieldNames.hasNext()) {
+                    String key = fieldNames.next();
+                    if (key.endsWith("-" + sourceLabel)) {
+                        JsonNode matchedNode = stepData.get(key);
+                        if (matchedNode != null && !matchedNode.isNull()) {
+                            return matchedNode.isTextual() ? matchedNode.asText() : matchedNode.toString();
+                        }
+                    }
+                }
+            }
         }
         return null;
+    }
+
+    private String extractSourceLabel(String sourcePath) {
+        if (!StringUtils.hasText(sourcePath)) {
+            return null;
+        }
+
+        int dashIndex = sourcePath.lastIndexOf('-');
+        if (dashIndex < 0 || dashIndex == sourcePath.length() - 1) {
+            return null;
+        }
+
+        return sourcePath.substring(dashIndex + 1);
     }
 
     private String resolveByStepAndField(SessionData sessionData, String stepId, String fieldKey) {

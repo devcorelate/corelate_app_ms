@@ -37,6 +37,20 @@ public class MockAppCertificateFieldMapping {
         this.pdfField = pdfField;
     }
 
+    /**
+     * Backward-compatible alias for legacy callers that still use targetField naming.
+     */
+    public String getTargetField() {
+        return pdfField;
+    }
+
+    /**
+     * Backward-compatible alias for legacy callers that still use targetField naming.
+     */
+    public void setTargetField(String targetField) {
+        this.pdfField = targetField;
+    }
+
     public String getSourcePath() {
         return sourcePath;
     }

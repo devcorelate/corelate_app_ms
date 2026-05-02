@@ -136,6 +136,8 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
     private String resolveSourceValue(SessionData sessionData, String sourcePath) {
         String sourceLabel = extractSourceLabel(sourcePath);
 
+        String sourceLabel = extractSourceLabel(sourcePath);
+
         for (SessionStep step : sessionData.getSteps()) {
             if (step.getSessionElementData() == null || step.getSessionElementData().getData() == null) {
                 continue;
@@ -154,6 +156,29 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
             String directValue = normalizedLabelValueMap.get(sourcePath.toLowerCase());
             if (directValue != null) {
                 return directValue;
+            }
+
+            if (sourceLabel != null) {
+                JsonNode mappedData = stepData.get("mappedData");
+                if (mappedData != null && mappedData.isObject()) {
+                    JsonNode mappedValue = mappedData.get(sourceLabel);
+                    if (mappedValue != null && !mappedValue.isNull()) {
+                        return mappedValue.isTextual() ? mappedValue.asText() : mappedValue.toString();
+                    }
+                }
+
+                var fieldNames = stepData.fieldNames();
+                while (fieldNames.hasNext()) {
+                    String key = fieldNames.next();
+                    String keyLabel = extractLabelFromKey(key);
+                    if (key.endsWith("-" + sourceLabel)
+                            || (keyLabel != null && keyLabel.equalsIgnoreCase(sourceLabel))) {
+                        JsonNode matchedNode = stepData.get(key);
+                        if (matchedNode != null && !matchedNode.isNull()) {
+                            return matchedNode.isTextual() ? matchedNode.asText() : matchedNode.toString();
+                        }
+                    }
+                }
             }
         }
         return null;

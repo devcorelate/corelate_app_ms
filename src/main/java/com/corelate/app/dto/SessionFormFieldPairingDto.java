@@ -13,4 +13,6 @@ public class SessionFormFieldPairingDto {
     private String sourcePath;
     private String targetField;
     private String value;
+    private String pdfTitle;
+    private String pdfDescription;
 }

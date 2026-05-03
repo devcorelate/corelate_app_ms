@@ -31,6 +31,11 @@ public class MockApp extends BaseEntity {
 
     private String certificatePdfPath;
 
+    private String pdfTitle;
+
+    @Column(columnDefinition = "TEXT")
+    private String pdfDescription;
+
     private String createdByEmail;
 
     private String applicationType;

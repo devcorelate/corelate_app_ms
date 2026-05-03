@@ -33,4 +33,9 @@ public class SessionFormFieldPairing {
 
     @Column(columnDefinition = "TEXT")
     private String value;
+
+    private String pdfTitle;
+
+    @Column(columnDefinition = "TEXT")
+    private String pdfDescription;
 }

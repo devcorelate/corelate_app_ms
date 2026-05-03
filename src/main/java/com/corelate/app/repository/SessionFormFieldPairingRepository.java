@@ -10,10 +10,9 @@ public interface SessionFormFieldPairingRepository extends JpaRepository<Session
 
     List<SessionFormFieldPairing> findBySessionId(String sessionId);
 
-    Optional<SessionFormFieldPairing> findBySessionIdAndWorkflowIdAndFormIdAndSourcePathAndTargetField(
+    Optional<SessionFormFieldPairing> findBySessionIdAndWorkflowIdAndSourcePathAndTargetField(
             String sessionId,
             String workflowId,
-            String formId,
             String sourcePath,
             String targetField
     );

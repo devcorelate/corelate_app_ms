@@ -96,6 +96,8 @@ logging:
     com:
       corelate:
         app: DEBUG
+    org.apache.kafka: OFF
+    org.springframework.kafka: OFF
   pattern:
     level: "%5p [${spring.application.name},%X{trace_id},%X{span_id}]"
 

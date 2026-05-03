@@ -17,7 +17,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -26,15 +26,16 @@ import java.util.Optional;
 
 @Service
 public class SessionFormPairingServiceImpl implements ISessionFormPairingService {
-
+    private final ObjectMapper objectMapper;
     private final SessionDataRepository sessionDataRepository;
     private final MockAppCertificateFieldMappingRepository mappingRepository;
     private final SessionFormFieldPairingRepository pairingRepository;
 
-    public SessionFormPairingServiceImpl(SessionDataRepository sessionDataRepository,
-                                         MockAppCertificateFieldMappingRepository mappingRepository,
-                                         SessionFormFieldPairingRepository pairingRepository) {
-        this.sessionDataRepository = sessionDataRepository;
+    public SessionFormPairingServiceImpl(ObjectMapper objectMapper, SessionDataRepository sessionDataRepository,
+										 MockAppCertificateFieldMappingRepository mappingRepository,
+										 SessionFormFieldPairingRepository pairingRepository) {
+		this.objectMapper = objectMapper;
+		this.sessionDataRepository = sessionDataRepository;
         this.mappingRepository = mappingRepository;
         this.pairingRepository = pairingRepository;
     }
@@ -63,32 +64,45 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
         int created = 0;
         int updated = 0;
         int skipped = 0;
+        System.out.println("=== FIELD MAPPING SIZE =========================================");
+        System.out.println("raw session data before parse: " + requestDto.getSessionId());
 
+        System.out.println("mappings size: " + (mappings == null ? "NULL" : mappings.size()));
+        System.out.println("raw session data steps: " + (sessionData == null ? "NULL" : sessionData.getSessionId()));
         for (MockAppCertificateFieldMapping mapping : mappings) {
             String resolvedSourcePath = StringUtils.hasText(mapping.getSourcePath())
                     ? mapping.getSourcePath()
                     : mapping.getTargetField();
 
+
+            System.out.println("=== FIELD MAPPING DEBUG =========================================");
+            System.out.println("sourcePath: " + mapping.getSourcePath());
+            System.out.println("targetField: " + mapping.getTargetField());
+            System.out.println("resolvedSourcePath: " + resolvedSourcePath);
+
+
             String value = resolveSourceValue(sessionData, resolvedSourcePath);
+
             if (value == null) {
+                System.out.println("SKIPPED: value is null for path " + resolvedSourcePath);
                 skipped++;
                 continue;
             }
-
-            String effectiveFormId = StringUtils.hasText(requestDto.getFormId())
-                    ? requestDto.getFormId()
-                    : mapping.getMockApp() != null ? mapping.getMockApp().getFormId() : null;
-
-            if (!StringUtils.hasText(effectiveFormId)) {
-                skipped++;
-                continue;
-            }
+            System.out.println("value: " + value);
+//            String effectiveFormId = StringUtils.hasText(requestDto.getFormId())
+//                    ? requestDto.getFormId()
+//                    : mapping.getMockApp() != null ? mapping.getMockApp().getFormId() : null;
+//
+//            if (!StringUtils.hasText(effectiveFormId)) {
+//                System.out.println("SKIPPED: no FormId");
+//                skipped++;
+//                continue;
+//            }
 
             Optional<SessionFormFieldPairing> existing = pairingRepository
-                    .findBySessionIdAndWorkflowIdAndFormIdAndSourcePathAndTargetField(
+                    .findBySessionIdAndWorkflowIdAndSourcePathAndTargetField(
                             requestDto.getSessionId(),
                             requestDto.getWorkflowId(),
-                            effectiveFormId,
                             resolvedSourcePath,
                             mapping.getTargetField()
                     );
@@ -97,20 +111,23 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                 SessionFormFieldPairing pairing = existing.get();
                 if (!value.equals(pairing.getValue())) {
                     pairing.setValue(value);
+                    System.out.println("UPDATED: " + pairing.getValue());
                     pairingRepository.save(pairing);
                     updated++;
                 } else {
+                    System.out.println("SKIPPED: value cant find");
                     skipped++;
                 }
             } else {
                 SessionFormFieldPairing pairing = new SessionFormFieldPairing();
                 pairing.setSessionId(requestDto.getSessionId());
                 pairing.setWorkflowId(requestDto.getWorkflowId());
-                pairing.setFormId(effectiveFormId);
+                pairing.setFormId(null);
                 pairing.setSourcePath(resolvedSourcePath);
                 pairing.setTargetField(mapping.getTargetField());
                 pairing.setValue(value);
                 pairingRepository.save(pairing);
+                System.out.println("CREATED: " + resolvedSourcePath);
                 created++;
             }
         }
@@ -134,8 +151,6 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
     }
 
     private String resolveSourceValue(SessionData sessionData, String sourcePath) {
-        String sourceLabel = extractSourceLabel(sourcePath);
-
         String sourceLabel = extractSourceLabel(sourcePath);
 
         for (SessionStep step : sessionData.getSteps()) {

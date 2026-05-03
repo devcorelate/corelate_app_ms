@@ -21,6 +21,10 @@ public class MockAppDto extends BaseDto {
 
     private String certificatePdfPath;
 
+    private String pdfTitle;
+
+    private String pdfDescription;
+
     private String createdByEmail;
 
     private String formId;

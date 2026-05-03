@@ -109,12 +109,15 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
 
             if (existing.isPresent()) {
                 SessionFormFieldPairing pairing = existing.get();
+                pairing.setPdfTitle(mapping.getMockApp() != null ? mapping.getMockApp().getPdfTitle() : null);
+                pairing.setPdfDescription(mapping.getMockApp() != null ? mapping.getMockApp().getPdfDescription() : null);
                 if (!value.equals(pairing.getValue())) {
                     pairing.setValue(value);
                     System.out.println("UPDATED: " + pairing.getValue());
                     pairingRepository.save(pairing);
                     updated++;
                 } else {
+                    pairingRepository.save(pairing);
                     System.out.println("SKIPPED: value cant find");
                     skipped++;
                 }
@@ -126,6 +129,8 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                 pairing.setSourcePath(resolvedSourcePath);
                 pairing.setTargetField(mapping.getTargetField());
                 pairing.setValue(value);
+                pairing.setPdfTitle(mapping.getMockApp() != null ? mapping.getMockApp().getPdfTitle() : null);
+                pairing.setPdfDescription(mapping.getMockApp() != null ? mapping.getMockApp().getPdfDescription() : null);
                 pairingRepository.save(pairing);
                 System.out.println("CREATED: " + resolvedSourcePath);
                 created++;
@@ -145,7 +150,9 @@ public class SessionFormPairingServiceImpl implements ISessionFormPairingService
                         pairing.getFormId(),
                         pairing.getSourcePath(),
                         pairing.getTargetField(),
-                        pairing.getValue()
+                        pairing.getValue(),
+                        pairing.getPdfTitle(),
+                        pairing.getPdfDescription()
                 ))
                 .toList();
     }

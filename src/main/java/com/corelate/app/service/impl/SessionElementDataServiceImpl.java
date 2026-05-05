@@ -46,6 +46,9 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
 
     @Value("${app.form-label-fetch.jitter-ms:50}")
     private long labelFetchJitterMs;
+
+    @Value("${app.form-label-fetch.fail-on-unavailable:true}")
+    private boolean failOnLabelFetchUnavailable;
     private final FormFeignClient formFeignClient;
     private final ObjectMapper objectMapper;
 
@@ -233,13 +236,23 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         for (int attempt = 1; attempt <= attempts; attempt++) {
             try {
                 logger.debug("Fetching labels by feign for batchSize={} attempt={}", elementIdBatch.size(), attempt);
+                long startTimeMs = System.currentTimeMillis();
                 List<FormElementLabelResponseDto> response = formFeignClient.fetchLabelsByElementIds(new FormElementLabelRequestDto(elementIdBatch));
-                logger.debug("Feign returned {} labels for batchSize={} attempt={}", response == null ? 0 : response.size(), elementIdBatch.size(), attempt);
+                long elapsedMs = System.currentTimeMillis() - startTimeMs;
+                logger.debug("Feign returned {} labels for batchSize={} attempt={} elapsedMs={}",
+                        response == null ? 0 : response.size(),
+                        elementIdBatch.size(),
+                        attempt,
+                        elapsedMs);
                 return response;
             } catch (Exception exception) {
                 if (attempt == attempts) {
                     logger.warn("Failed to fetch labels for batch after {} attempts. batchSize={}", attempts, elementIdBatch.size(), exception);
-                    throw new IllegalStateException("Unable to fetch labels from forms service", exception);
+                    if (failOnLabelFetchUnavailable) {
+                        throw new IllegalStateException("Unable to fetch labels from forms service", exception);
+                    }
+                    logger.warn("Continuing with empty labels because app.form-label-fetch.fail-on-unavailable=false");
+                    return List.of();
                 }
 
                 long sleepMs = computeBackoffWithJitter(attempt);

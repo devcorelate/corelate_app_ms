@@ -132,6 +132,35 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
 
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> field = fields.next();
+            fieldEntries.add(new AbstractMap.SimpleEntry<>(field.getKey(), field.getValue()));
+            if (!labelCache.containsKey(field.getKey())) {
+                missingElementIds.add(field.getKey());
+            }
+        }
+
+        if (!missingElementIds.isEmpty()) {
+            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
+        }
+
+        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
+        for (Map.Entry<String, JsonNode> field : fieldEntries) {
+            String elementId = field.getKey();
+            if (GENERATED_PDF_BASE64_FIELD.equals(elementId)) {
+                continue;
+            }
+
+            fieldEntries.add(new AbstractMap.SimpleEntry<>(elementId, field.getValue()));
+            if (!labelCache.containsKey(elementId)) {
+                missingElementIds.add(elementId);
+            }
+        }
+
+        if (!missingElementIds.isEmpty()) {
+            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
+        }
+
+        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
+        for (Map.Entry<String, JsonNode> field : fieldEntries) {
             String elementId = field.getKey();
             if (GENERATED_PDF_BASE64_FIELD.equals(elementId)) {
                 continue;

@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ import java.util.Set;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.AbstractMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class SessionElementDataServiceImpl implements ISessionElementDataService {
@@ -33,6 +35,18 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     private static final int LABEL_FETCH_BATCH_SIZE = 200;
 
     private final SessionElementDataRepository sessionElementDataRepository;
+
+    @Value("${app.form-label-fetch.batch-size:100}")
+    private int labelFetchBatchSize;
+
+    @Value("${app.form-label-fetch.max-retries:3}")
+    private int labelFetchMaxRetries;
+
+    @Value("${app.form-label-fetch.initial-backoff-ms:100}")
+    private long labelFetchInitialBackoffMs;
+
+    @Value("${app.form-label-fetch.jitter-ms:50}")
+    private long labelFetchJitterMs;
     private final FormFeignClient formFeignClient;
     private final ObjectMapper objectMapper;
 
@@ -174,14 +188,12 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         Map<String, FormElementLabelResponseDto> labelCache = new LinkedHashMap<>();
 
         try {
-            for (int startIndex = 0; startIndex < uniqueElementIds.size(); startIndex += LABEL_FETCH_BATCH_SIZE) {
-                int endIndex = Math.min(startIndex + LABEL_FETCH_BATCH_SIZE, uniqueElementIds.size());
+            int effectiveBatchSize = Math.max(1, labelFetchBatchSize);
+            for (int startIndex = 0; startIndex < uniqueElementIds.size(); startIndex += effectiveBatchSize) {
+                int endIndex = Math.min(startIndex + effectiveBatchSize, uniqueElementIds.size());
                 List<String> elementIdBatch = uniqueElementIds.subList(startIndex, endIndex);
 
-                List<FormElementLabelResponseDto> labels = formFeignClient.fetchLabelsByElementIds(
-                        new FormElementLabelRequestDto(elementIdBatch)
-                );
-
+                List<FormElementLabelResponseDto> labels = fetchBatchWithRetry(elementIdBatch);
                 if (labels == null || labels.isEmpty()) {
                     continue;
                 }
@@ -195,6 +207,43 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         } catch (Exception exception) {
             logger.warn("Unable to fetch labels from forms service for elementIds={}", elementIds, exception);
             return Map.of();
+        }
+    }
+
+    private List<FormElementLabelResponseDto> fetchBatchWithRetry(List<String> elementIdBatch) {
+        int attempts = Math.max(1, labelFetchMaxRetries);
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                return formFeignClient.fetchLabelsByElementIds(new FormElementLabelRequestDto(elementIdBatch));
+            } catch (Exception exception) {
+                if (attempt == attempts) {
+                    logger.warn("Failed to fetch labels for batch after {} attempts. batchSize={}", attempts, elementIdBatch.size(), exception);
+                    return List.of();
+                }
+
+                long sleepMs = computeBackoffWithJitter(attempt);
+                logger.debug("Retrying forms label fetch attempt={} sleepMs={} batchSize={}", attempt, sleepMs, elementIdBatch.size());
+                sleepQuietly(sleepMs);
+            }
+        }
+        return List.of();
+    }
+
+    private long computeBackoffWithJitter(int attempt) {
+        long baseDelay = labelFetchInitialBackoffMs * (1L << Math.max(0, attempt - 1));
+        long jitter = labelFetchJitterMs > 0 ? ThreadLocalRandom.current().nextLong(labelFetchJitterMs + 1) : 0L;
+        return baseDelay + jitter;
+    }
+
+    private void sleepQuietly(long sleepMs) {
+        if (sleepMs <= 0) {
+            return;
+        }
+
+        try {
+            Thread.sleep(sleepMs);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
         }
     }
 

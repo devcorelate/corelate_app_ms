@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 public class SessionElementDataServiceImpl implements ISessionElementDataService {
 
     private static final Logger logger = LoggerFactory.getLogger(SessionElementDataServiceImpl.class);
+    private static final int LABEL_FETCH_BATCH_SIZE = 200;
 
     private final SessionElementDataRepository sessionElementDataRepository;
     private final FormFeignClient formFeignClient;
@@ -160,22 +161,28 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
             return Map.of();
         }
 
-        try {
-            List<FormElementLabelResponseDto> labels = formFeignClient.fetchLabelsByElementIds(
-                    new FormElementLabelRequestDto(new ArrayList<>(elementIds))
-            );
+        List<String> uniqueElementIds = new ArrayList<>(elementIds);
+        Map<String, FormElementLabelResponseDto> labelCache = new LinkedHashMap<>();
 
-            if (labels == null || labels.isEmpty()) {
-                return Map.of();
+        try {
+            for (int startIndex = 0; startIndex < uniqueElementIds.size(); startIndex += LABEL_FETCH_BATCH_SIZE) {
+                int endIndex = Math.min(startIndex + LABEL_FETCH_BATCH_SIZE, uniqueElementIds.size());
+                List<String> elementIdBatch = uniqueElementIds.subList(startIndex, endIndex);
+
+                List<FormElementLabelResponseDto> labels = formFeignClient.fetchLabelsByElementIds(
+                        new FormElementLabelRequestDto(elementIdBatch)
+                );
+
+                if (labels == null || labels.isEmpty()) {
+                    continue;
+                }
+
+                labels.stream()
+                        .filter(label -> label.getElementId() != null)
+                        .forEach(label -> labelCache.putIfAbsent(label.getElementId(), label));
             }
 
-            return labels.stream()
-                    .filter(label -> label.getElementId() != null)
-                    .collect(Collectors.toMap(
-                            FormElementLabelResponseDto::getElementId,
-                            label -> label,
-                            (existing, replacement) -> existing
-                    ));
+            return labelCache;
         } catch (Exception exception) {
             logger.warn("Unable to fetch labels from forms service for elementIds={}", elementIds, exception);
             return Map.of();

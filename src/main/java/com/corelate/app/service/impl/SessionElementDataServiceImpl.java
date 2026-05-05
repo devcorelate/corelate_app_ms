@@ -32,7 +32,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class SessionElementDataServiceImpl implements ISessionElementDataService {
 
     private static final Logger logger = LoggerFactory.getLogger(SessionElementDataServiceImpl.class);
-    private static final int LABEL_FETCH_BATCH_SIZE = 200;
+    private static final String GENERATED_PDF_BASE64_FIELD = "generatedPdfBase64";
 
     private final SessionElementDataRepository sessionElementDataRepository;
 
@@ -136,6 +136,23 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
             fieldEntries.add(new AbstractMap.SimpleEntry<>(field.getKey(), field.getValue()));
             if (!labelCache.containsKey(field.getKey())) {
                 missingElementIds.add(field.getKey());
+            }
+        }
+
+        if (!missingElementIds.isEmpty()) {
+            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
+        }
+
+        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
+        for (Map.Entry<String, JsonNode> field : fieldEntries) {
+            String elementId = field.getKey();
+            if (GENERATED_PDF_BASE64_FIELD.equals(elementId)) {
+                continue;
+            }
+
+            fieldEntries.add(new AbstractMap.SimpleEntry<>(elementId, field.getValue()));
+            if (!labelCache.containsKey(elementId)) {
+                missingElementIds.add(elementId);
             }
         }
 

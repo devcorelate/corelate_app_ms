@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.AbstractMap;
 
 @Service
 public class SessionElementDataServiceImpl implements ISessionElementDataService {
@@ -112,11 +113,24 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     private List<SessionElementDataWithLabelDto> mapToDataWithLabelDtos(SessionElementData sessionElementData,
                                                                         Map<String, FormElementLabelResponseDto> labelCache) {
         JsonNode data = sessionElementData.getData();
-        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
+        List<Map.Entry<String, JsonNode>> fieldEntries = new ArrayList<>();
+        Set<String> missingElementIds = new HashSet<>();
         Iterator<Map.Entry<String, JsonNode>> fields = data.fields();
 
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> field = fields.next();
+            fieldEntries.add(new AbstractMap.SimpleEntry<>(field.getKey(), field.getValue()));
+            if (!labelCache.containsKey(field.getKey())) {
+                missingElementIds.add(field.getKey());
+            }
+        }
+
+        if (!missingElementIds.isEmpty()) {
+            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
+        }
+
+        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
+        for (Map.Entry<String, JsonNode> field : fieldEntries) {
             String elementId = field.getKey();
             JsonNode value = field.getValue();
             FormElementLabelResponseDto labelResponse = labelCache.get(elementId);
@@ -139,7 +153,7 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
                 .filter(this::hasDataObject)
                 .toList();
 
-        Map<String, FormElementLabelResponseDto> labelCache = fetchLabelCache(filteredData);
+        Map<String, FormElementLabelResponseDto> labelCache = new LinkedHashMap<>();
         return filteredData.stream()
                 .collect(Collectors.groupingBy(
                         SessionElementData::getWorkflowId,
@@ -151,13 +165,8 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
                 ));
     }
 
-    private Map<String, FormElementLabelResponseDto> fetchLabelCache(List<SessionElementData> dataList) {
-        Set<String> elementIds = new HashSet<>();
-        for (SessionElementData sessionElementData : dataList) {
-            sessionElementData.getData().fieldNames().forEachRemaining(elementIds::add);
-        }
-
-        if (elementIds.isEmpty()) {
+    private Map<String, FormElementLabelResponseDto> fetchLabelCacheByElementIds(Set<String> elementIds) {
+        if (elementIds == null || elementIds.isEmpty()) {
             return Map.of();
         }
 

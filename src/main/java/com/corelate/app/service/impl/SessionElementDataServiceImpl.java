@@ -1,5 +1,7 @@
 package com.corelate.app.service.impl;
 
+import com.corelate.app.dto.FormElementLabelRequestDto;
+import com.corelate.app.dto.FormElementLabelResponseDto;
 import com.corelate.app.dto.SessionElementDataWithLabelDto;
 import com.corelate.app.entity.SessionElementData;
 import com.corelate.app.exeption.ResourceNotFoundException;
@@ -16,9 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.LinkedHashMap;
-import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -51,18 +54,7 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     @Override
     @Transactional(readOnly = true)
     public Map<String, List<SessionElementDataWithLabelDto>> fetchAllDataWithLabel() {
-        Map<String, String> labelCache = new HashMap<>();
-        return sessionElementDataRepository.findAll()
-                .stream()
-                .filter(this::hasDataObject)
-                .collect(Collectors.groupingBy(
-                        SessionElementData::getWorkflowId,
-                        LinkedHashMap::new,
-                        Collectors.flatMapping(
-                                sessionElementData -> mapToDataWithLabelDtos(sessionElementData, labelCache).stream(),
-                                Collectors.toList()
-                        )
-                ));
+        return buildDataWithLabels(sessionElementDataRepository.findAll());
     }
 
     @Override
@@ -73,17 +65,7 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
             throw new ResourceNotFoundException("SessionElementData", "workflowId", workflowId);
         }
 
-        Map<String, String> labelCache = new HashMap<>();
-        return dataList.stream()
-                .filter(this::hasDataObject)
-                .collect(Collectors.groupingBy(
-                        SessionElementData::getWorkflowId,
-                        LinkedHashMap::new,
-                        Collectors.flatMapping(
-                                sessionElementData -> mapToDataWithLabelDtos(sessionElementData, labelCache).stream(),
-                                Collectors.toList()
-                        )
-                ));
+        return buildDataWithLabels(dataList);
     }
 
     @Override
@@ -127,7 +109,7 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     }
 
     private List<SessionElementDataWithLabelDto> mapToDataWithLabelDtos(SessionElementData sessionElementData,
-                                                                        Map<String, String> labelCache) {
+                                                                        Map<String, FormElementLabelResponseDto> labelCache) {
         JsonNode data = sessionElementData.getData();
         List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
         Iterator<Map.Entry<String, JsonNode>> fields = data.fields();
@@ -136,8 +118,10 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
             Map.Entry<String, JsonNode> field = fields.next();
             String elementId = field.getKey();
             JsonNode value = field.getValue();
-            String label = labelCache.computeIfAbsent(elementId, this::resolveLabel);
-            sessionElementDataWithLabelDtos.add(new SessionElementDataWithLabelDto(elementId, label, value));
+            FormElementLabelResponseDto labelResponse = labelCache.get(elementId);
+            String label = normalizeLabel(labelResponse == null ? null : labelResponse.getLabel());
+            String formId = labelResponse == null ? null : labelResponse.getFormId();
+            sessionElementDataWithLabelDtos.add(new SessionElementDataWithLabelDto(elementId, label, value, formId));
         }
 
         return sessionElementDataWithLabelDtos;
@@ -148,16 +132,53 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         return data != null && data.isObject();
     }
 
-    private String resolveLabel(String elementId) {
-        if (elementId == null) {
-            return "none";
+
+    private Map<String, List<SessionElementDataWithLabelDto>> buildDataWithLabels(List<SessionElementData> dataList) {
+        List<SessionElementData> filteredData = dataList.stream()
+                .filter(this::hasDataObject)
+                .toList();
+
+        Map<String, FormElementLabelResponseDto> labelCache = fetchLabelCache(filteredData);
+        return filteredData.stream()
+                .collect(Collectors.groupingBy(
+                        SessionElementData::getWorkflowId,
+                        LinkedHashMap::new,
+                        Collectors.flatMapping(
+                                sessionElementData -> mapToDataWithLabelDtos(sessionElementData, labelCache).stream(),
+                                Collectors.toList()
+                        )
+                ));
+    }
+
+    private Map<String, FormElementLabelResponseDto> fetchLabelCache(List<SessionElementData> dataList) {
+        Set<String> elementIds = new HashSet<>();
+        for (SessionElementData sessionElementData : dataList) {
+            sessionElementData.getData().fieldNames().forEachRemaining(elementIds::add);
+        }
+
+        if (elementIds.isEmpty()) {
+            return Map.of();
         }
 
         try {
-            return normalizeLabel(formFeignClient.fetchLabelByElementId(elementId));
+            List<FormElementLabelResponseDto> labels = formFeignClient.fetchLabelsByElementIds(
+                    new FormElementLabelRequestDto(new ArrayList<>(elementIds))
+            );
+
+            if (labels == null || labels.isEmpty()) {
+                return Map.of();
+            }
+
+            return labels.stream()
+                    .filter(label -> label.getElementId() != null)
+                    .collect(Collectors.toMap(
+                            FormElementLabelResponseDto::getElementId,
+                            label -> label,
+                            (existing, replacement) -> existing
+                    ));
         } catch (Exception exception) {
-            logger.warn("Unable to fetch label from forms service for elementId={}", elementId, exception);
-            return "none";
+            logger.warn("Unable to fetch labels from forms service for elementIds={}", elementIds, exception);
+            return Map.of();
         }
     }
 
@@ -166,22 +187,7 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
             return "none";
         }
 
-        String trimmedResponse = rawLabelResponse.trim();
-        if (!trimmedResponse.startsWith("{")) {
-            return rawLabelResponse;
-        }
-
-        try {
-            JsonNode labelResponseNode = objectMapper.readTree(trimmedResponse);
-            if (labelResponseNode.hasNonNull("label")) {
-                String label = labelResponseNode.get("label").asText();
-                return label.isBlank() ? "none" : label;
-            }
-            return "none";
-        } catch (Exception exception) {
-            logger.warn("Unable to parse label response from forms service: {}", rawLabelResponse, exception);
-        }
-        return "none";
+        return rawLabelResponse;
     }
 
 }

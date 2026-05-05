@@ -124,56 +124,39 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     }
 
     private List<SessionElementDataWithLabelDto> mapToDataWithLabelDtos(SessionElementData sessionElementData,
-                                                                        Map<String, FormElementLabelResponseDto> labelCache) {
+                                                                        Map<String, FormElementLabelResponseDto> labelCache,
+                                                                        Set<String> failedElementIds) {
         JsonNode data = sessionElementData.getData();
+        if (data == null || !data.isObject()) {
+            return List.of();
+        }
+
         Map<String, JsonNode> fieldValueByElementId = new LinkedHashMap<>();
         Set<String> missingElementIds = new HashSet<>();
         Iterator<Map.Entry<String, JsonNode>> fields = data.fields();
 
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> field = fields.next();
-            fieldEntries.add(new AbstractMap.SimpleEntry<>(field.getKey(), field.getValue()));
-            if (!labelCache.containsKey(field.getKey())) {
-                missingElementIds.add(field.getKey());
-            }
-        }
-
-        if (!missingElementIds.isEmpty()) {
-            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
-        }
-
-        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
-        for (Map.Entry<String, JsonNode> field : fieldEntries) {
-            String elementId = field.getKey();
-            if (GENERATED_PDF_BASE64_FIELD.equals(elementId)) {
-                continue;
-            }
-
-            fieldEntries.add(new AbstractMap.SimpleEntry<>(elementId, field.getValue()));
-            if (!labelCache.containsKey(elementId)) {
-                missingElementIds.add(elementId);
-            }
-        }
-
-        if (!missingElementIds.isEmpty()) {
-            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
-        }
-
-        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
-        for (Map.Entry<String, JsonNode> field : fieldEntries) {
             String elementId = field.getKey();
             if (GENERATED_PDF_BASE64_FIELD.equals(elementId)) {
                 continue;
             }
 
             fieldValueByElementId.putIfAbsent(elementId, field.getValue());
-            if (!labelCache.containsKey(elementId)) {
+            if (!labelCache.containsKey(elementId) && !failedElementIds.contains(elementId)) {
                 missingElementIds.add(elementId);
             }
         }
 
         if (!missingElementIds.isEmpty()) {
-            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
+            Map<String, FormElementLabelResponseDto> fetchedLabels = fetchLabelCacheByElementIds(missingElementIds);
+            labelCache.putAll(fetchedLabels);
+            missingElementIds.stream()
+                    .filter(elementId -> !fetchedLabels.containsKey(elementId))
+                    .forEach(failedElementIds::add);
+            if (!failedElementIds.isEmpty()) {
+                logger.debug("Skipping refetch for {} elementIds with previously failed label fetch", failedElementIds.size());
+            }
         }
 
         return fieldValueByElementId.entrySet().stream()
@@ -195,20 +178,26 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
 
 
     private Map<String, List<SessionElementDataWithLabelDto>> buildDataWithLabels(List<SessionElementData> dataList) {
+        logger.debug("Building data with labels for {} session records", dataList == null ? 0 : dataList.size());
         List<SessionElementData> filteredData = dataList.stream()
                 .filter(this::hasDataObject)
                 .toList();
+        logger.debug("Filtered session records with object data: {}", filteredData.size());
 
         Map<String, FormElementLabelResponseDto> labelCache = new LinkedHashMap<>();
-        return filteredData.stream()
+        Set<String> failedElementIds = new HashSet<>();
+        Map<String, List<SessionElementDataWithLabelDto>> response = filteredData.stream()
                 .collect(Collectors.groupingBy(
                         SessionElementData::getWorkflowId,
                         LinkedHashMap::new,
                         Collectors.flatMapping(
-                                sessionElementData -> mapToDataWithLabelDtos(sessionElementData, labelCache).stream(),
+                                sessionElementData -> mapToDataWithLabelDtos(sessionElementData, labelCache, failedElementIds).stream(),
                                 Collectors.toList()
                         )
                 ));
+        int dtoCount = response.values().stream().mapToInt(List::size).sum();
+        logger.debug("Built API response for {} workflows with {} total labeled data entries", response.size(), dtoCount);
+        return response;
     }
 
     private Map<String, FormElementLabelResponseDto> fetchLabelCacheByElementIds(Set<String> elementIds) {
@@ -219,38 +208,38 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         List<String> uniqueElementIds = new ArrayList<>(elementIds);
         Map<String, FormElementLabelResponseDto> labelCache = new LinkedHashMap<>();
 
-        try {
-            int effectiveBatchSize = Math.max(1, labelFetchBatchSize);
-            for (int startIndex = 0; startIndex < uniqueElementIds.size(); startIndex += effectiveBatchSize) {
-                int endIndex = Math.min(startIndex + effectiveBatchSize, uniqueElementIds.size());
-                List<String> elementIdBatch = uniqueElementIds.subList(startIndex, endIndex);
+        int effectiveBatchSize = Math.max(1, labelFetchBatchSize);
+        logger.debug("Fetching labels for {} unique elementIds using batchSize={}", uniqueElementIds.size(), effectiveBatchSize);
+        for (int startIndex = 0; startIndex < uniqueElementIds.size(); startIndex += effectiveBatchSize) {
+            int endIndex = Math.min(startIndex + effectiveBatchSize, uniqueElementIds.size());
+            List<String> elementIdBatch = uniqueElementIds.subList(startIndex, endIndex);
 
-                List<FormElementLabelResponseDto> labels = fetchBatchWithRetry(elementIdBatch);
-                if (labels == null || labels.isEmpty()) {
-                    continue;
-                }
-
-                labels.stream()
-                        .filter(label -> label.getElementId() != null)
-                        .forEach(label -> labelCache.putIfAbsent(label.getElementId(), label));
+            List<FormElementLabelResponseDto> labels = fetchBatchWithRetry(elementIdBatch);
+            logger.debug("Fetched {} labels from forms service for batch range [{}-{})", labels == null ? 0 : labels.size(), startIndex, endIndex);
+            if (labels == null || labels.isEmpty()) {
+                continue;
             }
 
-            return labelCache;
-        } catch (Exception exception) {
-            logger.warn("Unable to fetch labels from forms service for elementIds={}", elementIds, exception);
-            return Map.of();
+            labels.stream()
+                    .filter(label -> label.getElementId() != null)
+                    .forEach(label -> labelCache.putIfAbsent(label.getElementId(), label));
         }
+        logger.debug("Populated label cache with {} labels after feign fetch", labelCache.size());
+        return labelCache;
     }
 
     private List<FormElementLabelResponseDto> fetchBatchWithRetry(List<String> elementIdBatch) {
         int attempts = Math.max(1, labelFetchMaxRetries);
         for (int attempt = 1; attempt <= attempts; attempt++) {
             try {
-                return formFeignClient.fetchLabelsByElementIds(new FormElementLabelRequestDto(elementIdBatch));
+                logger.debug("Fetching labels by feign for batchSize={} attempt={}", elementIdBatch.size(), attempt);
+                List<FormElementLabelResponseDto> response = formFeignClient.fetchLabelsByElementIds(new FormElementLabelRequestDto(elementIdBatch));
+                logger.debug("Feign returned {} labels for batchSize={} attempt={}", response == null ? 0 : response.size(), elementIdBatch.size(), attempt);
+                return response;
             } catch (Exception exception) {
                 if (attempt == attempts) {
                     logger.warn("Failed to fetch labels for batch after {} attempts. batchSize={}", attempts, elementIdBatch.size(), exception);
-                    return List.of();
+                    throw new IllegalStateException("Unable to fetch labels from forms service", exception);
                 }
 
                 long sleepMs = computeBackoffWithJitter(attempt);

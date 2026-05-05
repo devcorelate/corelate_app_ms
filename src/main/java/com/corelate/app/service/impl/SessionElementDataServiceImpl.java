@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class SessionElementDataServiceImpl implements ISessionElementDataService {
 
     private static final Logger logger = LoggerFactory.getLogger(SessionElementDataServiceImpl.class);
+    private static final int LABEL_FETCH_BATCH_SIZE = 200;
 
     private final SessionElementDataRepository sessionElementDataRepository;
 

@@ -208,30 +208,24 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         List<String> uniqueElementIds = new ArrayList<>(elementIds);
         Map<String, FormElementLabelResponseDto> labelCache = new LinkedHashMap<>();
 
-        try {
-            int effectiveBatchSize = Math.max(1, labelFetchBatchSize);
-            logger.debug("Fetching labels for {} unique elementIds using batchSize={}", uniqueElementIds.size(), effectiveBatchSize);
-            for (int startIndex = 0; startIndex < uniqueElementIds.size(); startIndex += effectiveBatchSize) {
-                int endIndex = Math.min(startIndex + effectiveBatchSize, uniqueElementIds.size());
-                List<String> elementIdBatch = uniqueElementIds.subList(startIndex, endIndex);
+        int effectiveBatchSize = Math.max(1, labelFetchBatchSize);
+        logger.debug("Fetching labels for {} unique elementIds using batchSize={}", uniqueElementIds.size(), effectiveBatchSize);
+        for (int startIndex = 0; startIndex < uniqueElementIds.size(); startIndex += effectiveBatchSize) {
+            int endIndex = Math.min(startIndex + effectiveBatchSize, uniqueElementIds.size());
+            List<String> elementIdBatch = uniqueElementIds.subList(startIndex, endIndex);
 
-                List<FormElementLabelResponseDto> labels = fetchBatchWithRetry(elementIdBatch);
-                logger.debug("Fetched {} labels from forms service for batch range [{}-{})", labels == null ? 0 : labels.size(), startIndex, endIndex);
-                if (labels == null || labels.isEmpty()) {
-                    continue;
-                }
-
-                labels.stream()
-                        .filter(label -> label.getElementId() != null)
-                        .forEach(label -> labelCache.putIfAbsent(label.getElementId(), label));
+            List<FormElementLabelResponseDto> labels = fetchBatchWithRetry(elementIdBatch);
+            logger.debug("Fetched {} labels from forms service for batch range [{}-{})", labels == null ? 0 : labels.size(), startIndex, endIndex);
+            if (labels == null || labels.isEmpty()) {
+                continue;
             }
 
-            logger.debug("Populated label cache with {} labels after feign fetch", labelCache.size());
-            return labelCache;
-        } catch (Exception exception) {
-            logger.warn("Unable to fetch labels from forms service for elementIds={}", elementIds, exception);
-            return Map.of();
+            labels.stream()
+                    .filter(label -> label.getElementId() != null)
+                    .forEach(label -> labelCache.putIfAbsent(label.getElementId(), label));
         }
+        logger.debug("Populated label cache with {} labels after feign fetch", labelCache.size());
+        return labelCache;
     }
 
     private List<FormElementLabelResponseDto> fetchBatchWithRetry(List<String> elementIdBatch) {
@@ -245,7 +239,7 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
             } catch (Exception exception) {
                 if (attempt == attempts) {
                     logger.warn("Failed to fetch labels for batch after {} attempts. batchSize={}", attempts, elementIdBatch.size(), exception);
-                    return List.of();
+                    throw new IllegalStateException("Unable to fetch labels from forms service", exception);
                 }
 
                 long sleepMs = computeBackoffWithJitter(attempt);

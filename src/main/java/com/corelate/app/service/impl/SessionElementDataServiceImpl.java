@@ -126,41 +126,16 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     private List<SessionElementDataWithLabelDto> mapToDataWithLabelDtos(SessionElementData sessionElementData,
                                                                         Map<String, FormElementLabelResponseDto> labelCache) {
         JsonNode data = sessionElementData.getData();
+        if (data == null || !data.isObject()) {
+            return List.of();
+        }
+
         Map<String, JsonNode> fieldValueByElementId = new LinkedHashMap<>();
         Set<String> missingElementIds = new HashSet<>();
         Iterator<Map.Entry<String, JsonNode>> fields = data.fields();
 
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> field = fields.next();
-            fieldEntries.add(new AbstractMap.SimpleEntry<>(field.getKey(), field.getValue()));
-            if (!labelCache.containsKey(field.getKey())) {
-                missingElementIds.add(field.getKey());
-            }
-        }
-
-        if (!missingElementIds.isEmpty()) {
-            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
-        }
-
-        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
-        for (Map.Entry<String, JsonNode> field : fieldEntries) {
-            String elementId = field.getKey();
-            if (GENERATED_PDF_BASE64_FIELD.equals(elementId)) {
-                continue;
-            }
-
-            fieldEntries.add(new AbstractMap.SimpleEntry<>(elementId, field.getValue()));
-            if (!labelCache.containsKey(elementId)) {
-                missingElementIds.add(elementId);
-            }
-        }
-
-        if (!missingElementIds.isEmpty()) {
-            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
-        }
-
-        List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
-        for (Map.Entry<String, JsonNode> field : fieldEntries) {
             String elementId = field.getKey();
             if (GENERATED_PDF_BASE64_FIELD.equals(elementId)) {
                 continue;

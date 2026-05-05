@@ -128,5 +128,12 @@ resilience4j.ratelimiter:
       limitRefreshPeriod: 5000
       limitForPeriod: 1
 
+app:
+  form-label-fetch:
+    batch-size: 100
+    max-retries: 3
+    initial-backoff-ms: 100
+    jitter-ms: 50
+
 encrypt:
   key: WEd0VcO8pyygSprR0UZRe7ENxaG2aV

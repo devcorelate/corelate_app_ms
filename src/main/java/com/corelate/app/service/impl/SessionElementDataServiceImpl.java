@@ -124,7 +124,8 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     }
 
     private List<SessionElementDataWithLabelDto> mapToDataWithLabelDtos(SessionElementData sessionElementData,
-                                                                        Map<String, FormElementLabelResponseDto> labelCache) {
+                                                                        Map<String, FormElementLabelResponseDto> labelCache,
+                                                                        Set<String> failedElementIds) {
         JsonNode data = sessionElementData.getData();
         if (data == null || !data.isObject()) {
             return List.of();
@@ -142,13 +143,20 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
             }
 
             fieldValueByElementId.putIfAbsent(elementId, field.getValue());
-            if (!labelCache.containsKey(elementId)) {
+            if (!labelCache.containsKey(elementId) && !failedElementIds.contains(elementId)) {
                 missingElementIds.add(elementId);
             }
         }
 
         if (!missingElementIds.isEmpty()) {
-            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
+            Map<String, FormElementLabelResponseDto> fetchedLabels = fetchLabelCacheByElementIds(missingElementIds);
+            labelCache.putAll(fetchedLabels);
+            missingElementIds.stream()
+                    .filter(elementId -> !fetchedLabels.containsKey(elementId))
+                    .forEach(failedElementIds::add);
+            if (!failedElementIds.isEmpty()) {
+                logger.debug("Skipping refetch for {} elementIds with previously failed label fetch", failedElementIds.size());
+            }
         }
 
         return fieldValueByElementId.entrySet().stream()
@@ -177,12 +185,13 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         logger.debug("Filtered session records with object data: {}", filteredData.size());
 
         Map<String, FormElementLabelResponseDto> labelCache = new LinkedHashMap<>();
+        Set<String> failedElementIds = new HashSet<>();
         Map<String, List<SessionElementDataWithLabelDto>> response = filteredData.stream()
                 .collect(Collectors.groupingBy(
                         SessionElementData::getWorkflowId,
                         LinkedHashMap::new,
                         Collectors.flatMapping(
-                                sessionElementData -> mapToDataWithLabelDtos(sessionElementData, labelCache).stream(),
+                                sessionElementData -> mapToDataWithLabelDtos(sessionElementData, labelCache, failedElementIds).stream(),
                                 Collectors.toList()
                         )
                 ));

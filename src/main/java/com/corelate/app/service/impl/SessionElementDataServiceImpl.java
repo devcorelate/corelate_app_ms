@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.AbstractMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -127,7 +126,7 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
     private List<SessionElementDataWithLabelDto> mapToDataWithLabelDtos(SessionElementData sessionElementData,
                                                                         Map<String, FormElementLabelResponseDto> labelCache) {
         JsonNode data = sessionElementData.getData();
-        List<Map.Entry<String, JsonNode>> fieldEntries = new ArrayList<>();
+        Map<String, JsonNode> fieldValueByElementId = new LinkedHashMap<>();
         Set<String> missingElementIds = new HashSet<>();
         Iterator<Map.Entry<String, JsonNode>> fields = data.fields();
 
@@ -163,14 +162,30 @@ public class SessionElementDataServiceImpl implements ISessionElementDataService
         List<SessionElementDataWithLabelDto> sessionElementDataWithLabelDtos = new ArrayList<>();
         for (Map.Entry<String, JsonNode> field : fieldEntries) {
             String elementId = field.getKey();
-            JsonNode value = field.getValue();
-            FormElementLabelResponseDto labelResponse = labelCache.get(elementId);
-            String label = normalizeLabel(labelResponse == null ? null : labelResponse.getLabel());
-            String formId = labelResponse == null ? null : labelResponse.getFormId();
-            sessionElementDataWithLabelDtos.add(new SessionElementDataWithLabelDto(elementId, label, value, formId));
+            if (GENERATED_PDF_BASE64_FIELD.equals(elementId)) {
+                continue;
+            }
+
+            fieldValueByElementId.putIfAbsent(elementId, field.getValue());
+            if (!labelCache.containsKey(elementId)) {
+                missingElementIds.add(elementId);
+            }
         }
 
-        return sessionElementDataWithLabelDtos;
+        if (!missingElementIds.isEmpty()) {
+            labelCache.putAll(fetchLabelCacheByElementIds(missingElementIds));
+        }
+
+        return fieldValueByElementId.entrySet().stream()
+                .map(field -> {
+                    String elementId = field.getKey();
+                    JsonNode value = field.getValue();
+                    FormElementLabelResponseDto labelResponse = labelCache.get(elementId);
+                    String label = normalizeLabel(labelResponse == null ? null : labelResponse.getLabel());
+                    String formId = labelResponse == null ? null : labelResponse.getFormId();
+                    return new SessionElementDataWithLabelDto(elementId, label, value, formId);
+                })
+                .toList();
     }
 
     private boolean hasDataObject(SessionElementData sessionElementData) {
